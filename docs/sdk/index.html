@@ -1,0 +1,1842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:,">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Anchr SDK Docs</title>
+<meta name="description" content="SDK reference for verifiable paid requests with Anchr.">
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;450;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #ffffff;
+    --panel: #fbfbfc;
+    --ink: #1c1c1f;
+    --muted: #52525b;
+    --subtle: #71717a;
+    --faint: #a1a1aa;
+    --line: #ececef;
+    --line-soft: #f1f1f3;
+    --code-bg: #1c1c22;
+    --code-border: #27272a;
+    --accent: #4f46e5;
+    --accent-soft: #eef2ff;
+    --teal: #0d9488;
+    --amber: #d97706;
+    --green: #16a34a;
+    --orange: #c2410c;
+    --radius: 8px;
+    --font-sans: "Geist", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --font-mono: "Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+  }
+
+  ::selection {
+    background: #ddd6fe;
+  }
+
+  .anchr-doc {
+    min-height: 100vh;
+    display: flex;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  .anchr-doc * {
+    box-sizing: border-box;
+  }
+
+  .anchr-doc *::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .anchr-doc *::-webkit-scrollbar-thumb {
+    background: #d4d4d8;
+    border-radius: 999px;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    width: 272px;
+    height: 100vh;
+    flex: none;
+    align-self: flex-start;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid var(--line);
+    background: var(--panel);
+  }
+
+  .brand {
+    padding: 22px 22px 16px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .brand-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .brand-mark {
+    position: relative;
+    display: grid;
+    width: 28px;
+    height: 28px;
+    flex: none;
+    place-items: center;
+    border-radius: 7px;
+    background: var(--accent);
+    box-shadow: 0 1px 2px rgba(79, 70, 229, 0.35);
+  }
+
+  .brand-mark::after {
+    content: "";
+    width: 11px;
+    height: 11px;
+    border: 2.5px solid #fff;
+    border-bottom-color: transparent;
+    border-radius: 50%;
+    transform: rotate(45deg);
+  }
+
+  .brand-name {
+    display: block;
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .brand-kicker {
+    display: block;
+    margin-top: 1px;
+    color: var(--faint);
+    font-size: 11px;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .sidebar-nav {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 12px 24px;
+    scrollbar-width: none;
+  }
+
+  .sidebar-nav::-webkit-scrollbar {
+    width: 0;
+  }
+
+  .nav-group + .nav-group {
+    margin-top: 18px;
+  }
+
+  .nav-title {
+    margin: 6px 0;
+    padding: 0 12px;
+    color: var(--faint);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .nav-link {
+    display: block;
+    margin-bottom: 1px;
+    padding: 6px 12px;
+    border-radius: 7px;
+    color: var(--muted);
+    font-size: 13.5px;
+    font-weight: 450;
+    line-height: 1.4;
+    text-decoration: none;
+    transition: color 0.16s ease, background 0.16s ease;
+  }
+
+  .nav-link:hover,
+  .nav-link.is-active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .nav-link.is-active {
+    font-weight: 600;
+  }
+
+  .sidebar-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 22px;
+    border-top: 1px solid var(--line);
+  }
+
+  .version {
+    color: var(--subtle);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .outline-link {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #e4e4e7;
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 12px;
+    font-weight: 450;
+    padding: 4px 9px;
+    text-decoration: none;
+  }
+
+  .doc-main {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 14px 48px;
+    border-bottom: 1px solid var(--line-soft);
+    background: rgba(255, 255, 255, 0.86);
+    backdrop-filter: saturate(180%) blur(8px);
+  }
+
+  .breadcrumb {
+    color: var(--faint);
+    font-size: 12.5px;
+    font-weight: 500;
+  }
+
+  .breadcrumb strong {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 10px;
+    border: 1px solid #f6e2b8;
+    border-radius: 999px;
+    background: #fef6e7;
+    color: #9a6a00;
+    font-size: 11.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #e0a32e;
+  }
+
+  .content {
+    width: min(100%, 956px);
+    padding: 0 48px 120px;
+  }
+
+  .doc-section {
+    scroll-margin-top: 72px;
+    padding: 46px 0 8px;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .doc-section:first-child {
+    padding-top: 56px;
+    border-top: 0;
+  }
+
+  .eyebrow {
+    margin-bottom: 14px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+  }
+
+  .eyebrow.actor {
+    color: var(--teal);
+  }
+
+  .eyebrow.reference {
+    color: var(--orange);
+  }
+
+  h1,
+  h2,
+  h3,
+  p {
+    margin-top: 0;
+  }
+
+  h1 {
+    max-width: 720px;
+    margin-bottom: 18px;
+    font-size: 42px;
+    font-weight: 600;
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+
+  h2 {
+    margin-bottom: 8px;
+    font-size: 27px;
+    font-weight: 600;
+    line-height: 1.2;
+  }
+
+  h3 {
+    margin: 30px 0 8px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .lede {
+    max-width: 660px;
+    margin-bottom: 22px;
+    color: var(--muted);
+    font-size: 18px;
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  .section-copy {
+    max-width: 640px;
+    margin-bottom: 22px;
+    color: var(--muted);
+    font-size: 15.5px;
+    line-height: 1.6;
+    text-wrap: pretty;
+  }
+
+  .small-copy {
+    max-width: 640px;
+    color: var(--subtle);
+    font-size: 14px;
+    line-height: 1.6;
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 38px;
+  }
+
+  .button-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    min-height: 40px;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 550;
+    text-decoration: none;
+  }
+
+  .button-link.primary {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 1px 2px rgba(79, 70, 229, 0.4);
+  }
+
+  .button-link.secondary {
+    border: 1px solid #e4e4e7;
+    background: #fff;
+    color: #27272a;
+  }
+
+  .cards-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .info-card,
+  .schema-card,
+  .trust-card {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: #fff;
+  }
+
+  .info-card {
+    padding: 18px;
+  }
+
+  .card-title {
+    margin-bottom: 6px;
+    color: #18181b;
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .card-copy {
+    color: var(--subtle);
+    font-size: 13px;
+    font-weight: 450;
+    line-height: 1.55;
+  }
+
+  .flow-card {
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+  }
+
+  .actor-strip {
+    padding: 22px 22px 18px;
+    background: linear-gradient(180deg, #fafafb, #fff);
+  }
+
+  .actor-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .actor-pill {
+    display: flex;
+    min-height: 38px;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #efeff1;
+    border-radius: 8px;
+    background: #f4f4f5;
+    color: var(--faint);
+    font-size: 12.5px;
+    font-weight: 600;
+    text-align: center;
+    transition: background 0.25s ease, color 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  .actor-pill.is-from {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(79, 70, 229, 0.35);
+  }
+
+  .actor-pill.is-to {
+    border-color: #c7d2fe;
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+
+  .actor-pill.is-self {
+    border-color: var(--amber);
+    background: var(--amber);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(217, 119, 6, 0.3);
+  }
+
+  .progress-track {
+    height: 3px;
+    margin: 8px 22px 0;
+    border-radius: 999px;
+    background: var(--line-soft);
+  }
+
+  .progress-track span {
+    display: block;
+    width: var(--progress);
+    height: 100%;
+    border-radius: inherit;
+    background: var(--phase-color);
+    transition: width 0.3s ease, background 0.3s ease;
+  }
+
+  .flow-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    align-items: flex-start;
+    padding: 22px;
+  }
+
+  .flow-detail {
+    min-width: 280px;
+    flex: 1;
+  }
+
+  .step-meta {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .step-count {
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .phase-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 11px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--phase-color) 8%, transparent);
+    color: var(--phase-color);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+  }
+
+  .route {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .route-node {
+    padding: 6px 13px;
+    border-radius: 8px;
+    background: #f4f4f5;
+    color: #18181b;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .route-arrow,
+  .route-internal {
+    color: var(--faint);
+    font-weight: 600;
+  }
+
+  .route-internal {
+    color: var(--amber);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .step-message {
+    max-width: 400px;
+    color: #27272a;
+    font-size: 17px;
+    font-weight: 500;
+    line-height: 1.5;
+    text-wrap: pretty;
+  }
+
+  .flow-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 22px;
+  }
+
+  .doc-button {
+    display: inline-flex;
+    min-height: 34px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 8px 14px;
+    border: 1px solid #e4e4e7;
+    border-radius: 8px;
+    background: #fff;
+    color: #27272a;
+    cursor: pointer;
+    font: 550 13px var(--font-sans);
+  }
+
+  .doc-button.primary {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .doc-button.ghost {
+    border-color: transparent;
+    background: transparent;
+    color: var(--subtle);
+  }
+
+  .timeline {
+    width: 340px;
+    max-width: 100%;
+    flex: none;
+    padding-left: 18px;
+    border-left: 1px solid var(--line-soft);
+  }
+
+  .timeline-step {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 11px;
+    padding: 7px 10px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.18s ease;
+  }
+
+  .timeline-step.is-active {
+    background: #f5f3ff;
+  }
+
+  .timeline-number {
+    display: grid;
+    width: 21px;
+    height: 21px;
+    flex: none;
+    place-items: center;
+    border-radius: 50%;
+    background: #f1f1f3;
+    color: var(--faint);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    font-weight: 600;
+  }
+
+  .timeline-step.is-done .timeline-number {
+    background: color-mix(in srgb, var(--phase-color) 13%, transparent);
+    color: var(--phase-color);
+  }
+
+  .timeline-step.is-active .timeline-number {
+    background: var(--phase-color);
+    color: #fff;
+  }
+
+  .timeline-message {
+    flex: 1;
+    color: var(--faint);
+    font-size: 12.5px;
+    font-weight: 450;
+    line-height: 1.4;
+  }
+
+  .timeline-step.is-done .timeline-message {
+    color: var(--muted);
+  }
+
+  .timeline-step.is-active .timeline-message {
+    color: #18181b;
+    font-weight: 550;
+  }
+
+  .timeline-phase {
+    flex: none;
+    color: var(--phase-color);
+    font-family: var(--font-mono);
+    font-size: 9.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    opacity: 0.55;
+    text-transform: uppercase;
+  }
+
+  .timeline-step.is-active .timeline-phase {
+    opacity: 1;
+  }
+
+  .callout {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 15px 22px;
+    border-top: 1px solid var(--line-soft);
+    background: #fafafb;
+  }
+
+  .callout.inline {
+    margin: 20px 0 4px;
+    padding: 15px 17px;
+    border: 1px solid #f6e2b8;
+    border-radius: 8px;
+    background: #fffaf0;
+  }
+
+  .callout.warning {
+    padding: 16px 18px;
+    border: 1px solid #f6e2b8;
+    border-radius: 8px;
+    background: #fef6e7;
+  }
+
+  .callout-tag {
+    flex: none;
+    margin-top: 1px;
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: rgba(22, 163, 74, 0.08);
+    color: var(--green);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .callout-icon {
+    display: grid;
+    width: 18px;
+    height: 18px;
+    flex: none;
+    margin-top: 1px;
+    place-items: center;
+    border-radius: 50%;
+    background: #e0a32e;
+    color: #fff;
+    font-size: 12px;
+    font-weight: 700;
+  }
+
+  .callout-dot {
+    width: 8px;
+    height: 8px;
+    flex: none;
+    margin-top: 6px;
+    border-radius: 50%;
+    background: #e0a32e;
+  }
+
+  .callout p {
+    margin: 0;
+    color: var(--subtle);
+    font-size: 13px;
+    font-weight: 450;
+    line-height: 1.55;
+  }
+
+  .callout.inline p,
+  .callout.warning p {
+    color: #854d0e;
+    font-size: 13.5px;
+  }
+
+  .code-panel {
+    position: relative;
+    margin: 18px 0;
+    border-radius: 8px;
+    background: var(--code-bg);
+  }
+
+  .code-panel.flush {
+    margin-top: 0;
+  }
+
+  .copy-button {
+    position: absolute;
+    top: 11px;
+    right: 11px;
+    z-index: 2;
+    padding: 4px 9px;
+    border: 1px solid #3f3f46;
+    border-radius: 6px;
+    background: #27272a;
+    color: var(--faint);
+    cursor: pointer;
+    font: 500 11.5px var(--font-sans);
+  }
+
+  pre {
+    margin: 0;
+    overflow: auto;
+    border: 1px solid var(--code-border);
+    border-radius: 8px;
+    background: var(--code-bg);
+    color: #e4e4e7;
+    font: 13px/1.7 var(--font-mono);
+  }
+
+  pre code {
+    display: block;
+    min-width: max-content;
+    padding: 18px 20px;
+    white-space: pre;
+  }
+
+  .inline-code,
+  p code,
+  td code {
+    padding: 1px 6px;
+    border-radius: 5px;
+    background: #f4f4f5;
+    color: var(--accent);
+    font: 500 13px var(--font-mono);
+  }
+
+  .tabbar {
+    display: flex;
+    gap: 4px;
+    padding: 0 4px;
+    border-bottom: 1px solid var(--code-border);
+    border-radius: 8px 8px 0 0;
+    background: var(--code-bg);
+  }
+
+  .tab-button {
+    padding: 9px 17px;
+    border: 0;
+    border-radius: 8px 8px 0 0;
+    background: transparent;
+    color: var(--faint);
+    cursor: pointer;
+    font: 550 13px var(--font-sans);
+    transition: color 0.18s ease, background 0.18s ease;
+  }
+
+  .tab-button.is-active {
+    background: #27272a;
+    color: #fff;
+  }
+
+  .tabbed-code {
+    border-top-left-radius: 0;
+    border-top-right-radius: 0;
+  }
+
+  .schema-list {
+    display: grid;
+    gap: 12px;
+  }
+
+  .schema-card {
+    padding: 18px 20px;
+  }
+
+  .schema-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+  }
+
+  .schema-name {
+    color: #18181b;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .schema-id {
+    padding: 3px 8px;
+    border-radius: 6px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    font: 500 11.5px var(--font-mono);
+  }
+
+  .schema-card p {
+    margin-bottom: 10px;
+    color: var(--subtle);
+    font-size: 13.5px;
+    font-weight: 450;
+    line-height: 1.55;
+  }
+
+  .schema-url {
+    color: var(--muted);
+    font: 500 12px var(--font-mono);
+  }
+
+  .trust-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+  }
+
+  .trust-card {
+    padding: 20px;
+  }
+
+  .trust-key {
+    margin-bottom: 8px;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .trust-card h3 {
+    margin: 0 0 8px;
+    color: #18181b;
+    font-size: 15px;
+  }
+
+  .trust-card p {
+    margin: 0;
+    color: var(--subtle);
+    font-size: 13px;
+    font-weight: 450;
+    line-height: 1.55;
+  }
+
+  .mono-heading {
+    margin: 8px 0 10px;
+    color: #18181b;
+    font: 600 13px var(--font-mono);
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    margin-bottom: 26px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+  }
+
+  table {
+    width: 100%;
+    min-width: 620px;
+    border-collapse: collapse;
+    font-family: var(--font-sans);
+  }
+
+  thead {
+    background: #fafafb;
+  }
+
+  th,
+  td {
+    padding: 11px 16px;
+    border-bottom: 1px solid #f4f4f5;
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    color: var(--subtle);
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+
+  tr:last-child td {
+    border-bottom: 0;
+  }
+
+  td {
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  td:first-child {
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  td:nth-child(2) {
+    color: var(--subtle);
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+  }
+
+  .doc-footer {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 54px;
+    padding-top: 26px;
+    border-top: 1px solid var(--line-soft);
+  }
+
+  .license {
+    color: var(--faint);
+    font-size: 13px;
+    font-weight: 450;
+  }
+
+  .license strong {
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .footer-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  .footer-links a {
+    color: var(--muted);
+    font-size: 13px;
+    font-weight: 500;
+    text-decoration: none;
+  }
+
+  @media (max-width: 980px) {
+    .anchr-doc {
+      display: block;
+    }
+
+    .sidebar {
+      position: static;
+      width: auto;
+      height: auto;
+      border-right: 0;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .sidebar-nav {
+      display: flex;
+      gap: 18px;
+      overflow-x: auto;
+      padding: 12px;
+      scrollbar-width: auto;
+    }
+
+    .sidebar-nav::-webkit-scrollbar {
+      height: 8px;
+    }
+
+    .nav-group {
+      min-width: max-content;
+    }
+
+    .sidebar-footer {
+      display: none;
+    }
+
+    .topbar {
+      padding: 12px 24px;
+    }
+
+    .content {
+      padding: 0 24px 80px;
+    }
+  }
+
+  @media (max-width: 760px) {
+    h1 {
+      font-size: 34px;
+    }
+
+    .cards-grid,
+    .trust-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .actor-grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .timeline {
+      width: 100%;
+      padding-left: 0;
+      border-left: 0;
+    }
+
+    .topbar {
+      align-items: flex-start;
+      flex-direction: column;
+      gap: 8px;
+    }
+  }
+</style>
+</helmet>
+
+<div class="anchr-doc">
+  <aside class="sidebar">
+    <header class="brand">
+      <a class="brand-link" href="#overview" aria-label="Anchr SDK docs home">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <span>
+          <span class="brand-name">Anchr</span>
+          <span class="brand-kicker">SDK Docs</span>
+        </span>
+      </a>
+    </header>
+
+    <nav class="sidebar-nav" aria-label="SDK sections">
+      <sc-for list="{{ navGroups }}" as="group" hint-placeholder-count="3">
+        <div class="nav-group">
+          <div class="nav-title">{{ group.label }}</div>
+          <sc-for list="{{ group.items }}" as="item" hint-placeholder-count="4">
+            <a class="{{ item.className }}" href="{{ item.href }}" data-nav="{{ item.id }}" aria-current="{{ item.ariaCurrent }}">{{ item.label }}</a>
+          </sc-for>
+        </div>
+      </sc-for>
+    </nav>
+
+    <div class="sidebar-footer">
+      <span class="version">{{ version }}</span>
+      <a class="outline-link" href="https://github.com/motxx/anchr" target="_blank" rel="noopener">GitHub &#8599;</a>
+    </div>
+  </aside>
+
+  <main class="doc-main">
+    <div class="topbar">
+      <div class="breadcrumb">SDK Reference <span aria-hidden="true">/</span> <strong>@anchr/sdk</strong></div>
+      <span class="status-pill"><span class="status-dot" aria-hidden="true"></span>Experimental &middot; Testnet</span>
+    </div>
+
+    <div class="content">
+      <section id="overview" class="doc-section">
+        <div class="eyebrow">@anchr/sdk</div>
+        <h1>An SDK for verifiable paid requests</h1>
+        <p class="lede">A Customer publishes a payment budget, selects one Provider, and locks payment for that Provider&rsquo;s requested amount. The Provider returns work with proof and can redeem only after a trusted Oracle accepts the proof, removing the pay-first / deliver-first deadlock for off-chain work.</p>
+        <div class="actions">
+          <a class="button-link primary" href="#install">Get started &#8594;</a>
+          <a class="button-link secondary" href="#how-it-works">See the protocol flow</a>
+        </div>
+
+        <div class="cards-grid">
+          <sc-for list="{{ featureCards }}" as="card" hint-placeholder-count="3">
+            <article class="info-card">
+              <div class="card-title">{{ card.title }}</div>
+              <div class="card-copy">{{ card.copy }}</div>
+            </article>
+          </sc-for>
+        </div>
+      </section>
+
+      <section id="how-it-works" class="doc-section">
+        <h2>How it works</h2>
+        <p class="section-copy">One Paid Request moves through discovery, selection, work, and settlement. Step through the lifecycle; the Oracle never holds funds, it only controls release of the unlock secret.</p>
+
+        <div class="flow-card">
+          <div class="actor-strip">
+            <div class="actor-grid">
+              <sc-for list="{{ actorPills }}" as="actor" hint-placeholder-count="5">
+                <div class="{{ actor.className }}">{{ actor.name }}</div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div class="progress-track" style="{{ progressStyle }}"><span></span></div>
+
+          <div class="flow-body">
+            <div class="flow-detail">
+              <div class="step-meta">
+                <span class="step-count">Step {{ stepNum }} / {{ stepTotal }}</span>
+                <span class="phase-badge" style="{{ phaseStyle }}">{{ stepPhase }}</span>
+              </div>
+
+              <div class="route">
+                <span class="route-node">{{ stepFrom }}</span>
+                <sc-if value="{{ isSelf }}" hint-placeholder-val="{{ false }}">
+                  <span class="route-internal">&#8635; internal</span>
+                </sc-if>
+                <sc-if value="{{ isExternal }}" hint-placeholder-val="{{ true }}">
+                  <span class="route-arrow">&#8594;</span>
+                  <span class="route-node">{{ stepTo }}</span>
+                </sc-if>
+              </div>
+
+              <p class="step-message">{{ stepMsg }}</p>
+
+              <div class="flow-actions">
+                <button class="doc-button" type="button" onClick="{{ prev }}">&#8592; Prev</button>
+                <button class="doc-button" type="button" onClick="{{ next }}">Next &#8594;</button>
+                <button class="doc-button primary" type="button" onClick="{{ togglePlay }}">{{ playLabel }}</button>
+                <button class="doc-button ghost" type="button" onClick="{{ reset }}">Reset</button>
+              </div>
+            </div>
+
+            <div class="timeline" aria-label="Protocol timeline">
+              <sc-for list="{{ timeline }}" as="event" hint-placeholder-count="14">
+                <button class="{{ event.className }}" style="{{ event.style }}" type="button" onClick="{{ event.onClick }}">
+                  <span class="timeline-number">{{ event.number }}</span>
+                  <span class="timeline-message">{{ event.msg }}</span>
+                  <span class="timeline-phase">{{ event.phase }}</span>
+                </button>
+              </sc-for>
+            </div>
+          </div>
+
+          <div class="callout">
+            <span class="callout-tag">ALT</span>
+            <p>If no valid proof arrives before the timeout, the Customer recovers the Payment Lock through the refund path: <strong>Customer &#8594; Mint: Refund after timeout</strong>.</p>
+          </div>
+        </div>
+      </section>
+
+      <section id="install" class="doc-section">
+        <h2>Install</h2>
+        <p class="section-copy">Add the SDK with your runtime&rsquo;s package manager. You also need deployment-owned infrastructure: a Cashu mint URL, a Nostr relay URL, an Oracle pubkey, and a Provider Nostr secret key. TLSNotary schemas additionally need a notary.</p>
+
+        <div class="code-panel">
+          <button class="copy-button" type="button" onClick="{{ copyCode }}" data-label="Copy" aria-label="Copy install command">Copy</button>
+          <pre><code>{{ installCode }}</code></pre>
+        </div>
+
+        <p class="small-copy">Workspace consumers can pin the Deno import map directly:</p>
+        <div class="code-panel">
+          <button class="copy-button" type="button" onClick="{{ copyCode }}" data-label="Copy" aria-label="Copy import map">Copy</button>
+          <pre><code>{{ importMapCode }}</code></pre>
+        </div>
+      </section>
+
+      <section id="quick-start" class="doc-section">
+        <h2>Quick start</h2>
+        <p class="section-copy">Publish a kind <code>5300</code> Request Notice to a relay you choose and read it back. No payment is locked; the notice carries only public discovery fields.</p>
+
+        <div class="code-panel">
+          <button class="copy-button" type="button" onClick="{{ copyCode }}" data-label="Copy" aria-label="Copy quick start command">Copy</button>
+          <pre><code>{{ quickStartCode }}</code></pre>
+        </div>
+
+        <h3>Wire up an actor</h3>
+        <p class="small-copy">The same primitives compose the full Customer / Provider / Oracle exchange. Pick a role:</p>
+
+        <div class="tabbar" role="tablist" aria-label="Quick start role examples">
+          <sc-for list="{{ qsTabs }}" as="tab" hint-placeholder-count="3">
+            <button class="{{ tab.className }}" type="button" role="tab" aria-selected="{{ tab.selected }}" onClick="{{ tab.onClick }}">{{ tab.label }}</button>
+          </sc-for>
+        </div>
+
+        <div class="code-panel flush">
+          <button class="copy-button" type="button" onClick="{{ copyCode }}" data-label="Copy" aria-label="Copy selected role example">Copy</button>
+          <pre class="tabbed-code"><code>{{ qsCode }}</code></pre>
+        </div>
+      </section>
+
+      <section id="customer" class="doc-section">
+        <div class="eyebrow actor">ACTOR API</div>
+        <h2>Customer</h2>
+        <p class="section-copy">The Customer creates a Paid Request, publishes a Payment Budget, selects one Provider, and locks payment for that Provider&rsquo;s Requested Payment Amount. <code>request()</code> drives the whole lifecycle and resolves once verified work returns.</p>
+
+        <div class="code-panel">
+          <button class="copy-button" type="button" onClick="{{ copyCode }}" data-label="Copy" aria-label="Copy customer request example">Copy</button>
+          <pre><code>{{ customerRequestCode }}</code></pre>
+        </div>
+
+        <h3>Multi-Oracle whitelist</h3>
+        <p class="small-copy">Keep <code>oracles</code> as the trust policy and provide an <code>oracleSelector</code> to pick from the whitelist. Each entry bootstraps the payment-hash commitment over relay DMs.</p>
+        <div class="code-panel">
+          <button class="copy-button" type="button" onClick="{{ copyCode }}" data-label="Copy" aria-label="Copy Oracle whitelist example">Copy</button>
+          <pre><code>{{ oracleWhitelistCode }}</code></pre>
+        </div>
+      </section>
+
+      <section id="provider" class="doc-section">
+        <div class="eyebrow actor">ACTOR API</div>
+        <h2>Provider</h2>
+        <p class="section-copy">The Provider offers to complete a Paid Request for a Requested Payment Amount, returns Work with Proof, and redeems payment after valid release. <code>serve()</code> runs a handler for every incoming request; return <code>null</code> to decline.</p>
+
+        <div class="code-panel">
+          <button class="copy-button" type="button" onClick="{{ copyCode }}" data-label="Copy" aria-label="Copy provider serve example">Copy</button>
+          <pre><code>{{ providerServeCode }}</code></pre>
+        </div>
+
+        <div class="callout inline">
+          <span class="callout-icon">!</span>
+          <p><strong>Verify before irreversible work.</strong> A Provider must verify the selected Payment Lock <em>before</em> doing the Work, and keep redeem decisions narrower than clean-settlement or audit decisions. The normative rules live in <code>specs/paid-request-exchange.md</code>.</p>
+        </div>
+      </section>
+
+      <section id="oracle" class="doc-section">
+        <div class="eyebrow actor">ACTOR API</div>
+        <h2>Oracle &amp; proofs</h2>
+        <p class="section-copy">The Oracle verifies Proof and produces Release Material for valid Work. It never holds funds; it only controls whether the Cashu HTLC unlock secret is released. Each request carries a <code>schema</code> URL that the Provider&rsquo;s handler interprets.</p>
+
+        <h3>Built-in Proof Schemas</h3>
+        <div class="schema-list">
+          <sc-for list="{{ proofSchemas }}" as="schema" hint-placeholder-count="2">
+            <article class="schema-card">
+              <div class="schema-head">
+                <span class="schema-name">{{ schema.name }}</span>
+                <code class="schema-id">{{ schema.id }}</code>
+              </div>
+              <p>{{ schema.copy }}</p>
+              <code class="schema-url">{{ schema.url }}</code>
+            </article>
+          </sc-for>
+        </div>
+
+        <p class="small-copy">Verifier helpers are exported from <code>@anchr/sdk/proofs</code>. Applications can publish their own HTTPS schema URLs for proof formats outside the built-in set; wire your own <code>produce()</code> in the Provider handler to match.</p>
+      </section>
+
+      <section id="trust" class="doc-section">
+        <div class="eyebrow reference">REFERENCE</div>
+        <h2>Trust assumptions</h2>
+        <p class="section-copy">Anchr removes the pay-first / deliver-first deadlock, but it is <strong>not fully trustless</strong>. Production deployments must choose and monitor two trust roots.</p>
+
+        <div class="trust-grid">
+          <sc-for list="{{ trustCards }}" as="card" hint-placeholder-count="2">
+            <article class="trust-card">
+              <div class="trust-key">{{ card.key }}</div>
+              <h3>{{ card.title }}</h3>
+              <p>{{ card.copy }}</p>
+            </article>
+          </sc-for>
+        </div>
+
+        <div class="callout warning">
+          <span class="callout-dot"></span>
+          <p><strong>Experimental &amp; testnet-focused.</strong> Use explicit Oracle whitelists, threshold signing where appropriate, and deployment-owned Mint policy before treating any flow as production infrastructure. Read the full threat model first.</p>
+        </div>
+      </section>
+
+      <section id="reference" class="doc-section">
+        <div class="eyebrow reference">REFERENCE</div>
+        <h2>API reference</h2>
+
+        <sc-for list="{{ referenceTables }}" as="table" hint-placeholder-count="3">
+          <h3 class="mono-heading">{{ table.title }}</h3>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <sc-for list="{{ table.headers }}" as="header" hint-placeholder-count="3">
+                    <th>{{ header }}</th>
+                  </sc-for>
+                </tr>
+              </thead>
+              <tbody>
+                <sc-for list="{{ table.rows }}" as="row" hint-placeholder-count="4">
+                  <tr>
+                    <td>{{ row.a }}</td>
+                    <td>{{ row.b }}</td>
+                    <td>{{ row.c }}</td>
+                  </tr>
+                </sc-for>
+              </tbody>
+            </table>
+          </div>
+        </sc-for>
+      </section>
+
+      <footer class="doc-footer">
+        <div class="license">Code <strong>MIT</strong> &middot; Specs <strong>CC0</strong>; anyone may implement them.</div>
+        <div class="footer-links">
+          <sc-for list="{{ footerLinks }}" as="link" hint-placeholder-count="3">
+            <a href="{{ link.href }}" target="_blank" rel="noopener">{{ link.label }} &#8599;</a>
+          </sc-for>
+        </div>
+      </footer>
+    </div>
+  </main>
+</div>
+</x-dc>
+
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1180,&quot;height&quot;:820}}">
+class Component extends DCLogic {
+  version = "v0.0.1";
+
+  state = {
+    activeSection: "overview",
+    playing: false,
+    qsTab: "customer",
+    step: 0,
+  };
+
+  navGroups = [
+    {
+      label: "Getting started",
+      items: [
+        { id: "overview", label: "Overview" },
+        { id: "how-it-works", label: "How it works" },
+        { id: "install", label: "Install" },
+        { id: "quick-start", label: "Quick start" },
+      ],
+    },
+    {
+      label: "Actor APIs",
+      items: [
+        { id: "customer", label: "Customer" },
+        { id: "provider", label: "Provider" },
+        { id: "oracle", label: "Oracle & proofs" },
+      ],
+    },
+    {
+      label: "Reference",
+      items: [
+        { id: "trust", label: "Trust assumptions" },
+        { id: "reference", label: "API reference" },
+      ],
+    },
+  ];
+
+  featureCards = [
+    {
+      title: "Nostr transport",
+      copy: "Peer discovery and request / response over relays you choose.",
+    },
+    {
+      title: "Cashu HTLCs",
+      copy: "Payment locks with automatic refunds on the timeout path.",
+    },
+    {
+      title: "Oracle verification",
+      copy: "TLSNotary, C2PA/GPS images, or app-specific proofs.",
+    },
+  ];
+
+  steps = [
+    { from: "Customer", to: "Relay", msg: "Publish Request Notice with Payment Budget", phase: "Discovery" },
+    { from: "Relay", to: "Provider", msg: "Deliver Request Notice", phase: "Discovery" },
+    { from: "Provider", to: "Relay", msg: "Publish Provider Offer", phase: "Discovery" },
+    { from: "Relay", to: "Customer", msg: "Deliver Provider Offer", phase: "Discovery" },
+    { from: "Customer", to: "Oracle", msg: "Request payment hash commitment", phase: "Selection" },
+    { from: "Oracle", to: "Customer", msg: "Return hash commitment", phase: "Selection" },
+    { from: "Customer", to: "Mint", msg: "Lock selected offer amount as a Cashu HTLC", phase: "Selection" },
+    { from: "Customer", to: "Relay", msg: "Select Provider and deliver Payment Lock", phase: "Selection" },
+    { from: "Relay", to: "Provider", msg: "Deliver Provider Selection", phase: "Selection" },
+    { from: "Provider", to: "Provider", msg: "Verify Payment Lock before irreversible work", phase: "Work" },
+    { from: "Provider", to: "Provider", msg: "Produce Work and Proof", phase: "Work" },
+    { from: "Provider", to: "Oracle", msg: "Submit Proof for verification", phase: "Work" },
+    { from: "Oracle", to: "Provider", msg: "Release unlock secret (proof accepted)", phase: "Settlement" },
+    { from: "Provider", to: "Mint", msg: "Redeem the HTLC", phase: "Settlement" },
+  ];
+
+  actors = ["Customer", "Relay", "Provider", "Oracle", "Mint"];
+
+  phaseColors = {
+    Discovery: "#0d9488",
+    Selection: "#4f46e5",
+    Work: "#d97706",
+    Settlement: "#16a34a",
+  };
+
+  proofSchemas = [
+    {
+      name: "TLSNotary attestation",
+      id: "ProofSchema.TlsnV1",
+      copy: "A TLSNotary attestation of an HTTPS response; prove a private API returned a value without exposing credentials. Requires a notary.",
+      url: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    },
+    {
+      name: "C2PA image manifest",
+      id: "ProofSchema.C2paImageV1",
+      copy: "A C2PA image manifest with a signed GPS binding; prove a photo was captured at the requested location.",
+      url: "https://anchr-spec.org/spec/proof/c2pa-image/v1",
+    },
+  ];
+
+  trustCards = [
+    {
+      key: "INV-02",
+      title: "Oracle release authority",
+      copy: "The honest SDK Oracle wrapper does not release the Cashu HTLC preimage when verification fails. A malicious solo Oracle, or a colluding FROST threshold, can still sign the wrong outcome outside that wrapper.",
+    },
+    {
+      key: "SETTLEMENT",
+      title: "Cashu Mint custody",
+      copy: "The current settlement path trusts one Cashu Mint for solvency and HTLC enforcement. Mint-layer alternatives and their tradeoffs are tracked in the threat model.",
+    },
+  ];
+
+  referenceTables = [
+    {
+      title: "createCustomer(options)",
+      headers: ["Field", "Type", "Description"],
+      rows: [
+        { a: "oracles", b: "{ pubkey }[]", c: "Oracle trust policy / whitelist." },
+        { a: "relays", b: "string[]", c: "Nostr relay URLs for discovery and transport." },
+        { a: "mint", b: "string", c: "Cashu mint URL for Payment Locks." },
+        { a: "cashuClient", b: "CashuClient", c: "Payment client. createCashuClient or an in-memory fake." },
+        { a: "relayClient", b: "RelayClient", c: "Nostr transport client." },
+        { a: "oracleSelector?", b: "(o) => string", c: "Choose one Oracle from the whitelist." },
+      ],
+    },
+    {
+      title: "customer.request(args)",
+      headers: ["Field", "Type", "Description"],
+      rows: [
+        { a: "spec.schema", b: "ProofSchema | string", c: "Proof Schema identifier or custom URL." },
+        { a: "spec.predicate", b: "{ target, conditions? }", c: "What the Work must satisfy." },
+        { a: "payment.maxAmount", b: "number", c: "Payment Budget in sats." },
+        { a: "fundingProofs", b: "CashuProof[]", c: "Wallet proofs used to fund the lock. Returns { data, proof, providerPubkey }." },
+      ],
+    },
+    {
+      title: "Entry points",
+      headers: ["Import", "Provides", ""],
+      rows: [
+        { a: "@anchr/sdk", b: "main", c: "Customer, Provider, Oracle, payment, proof, attachment, and adapter APIs." },
+        { a: "@anchr/sdk/proofs", b: "proof helpers", c: "TLSNotary and C2PA verifier helpers." },
+        { a: "@anchr/sdk/testing", b: "test fakes", c: "In-memory Cashu and relay fakes for unit tests." },
+        { a: "@anchr/protocol", b: "wire contract", c: "Nostr wire events, settlement fields, schema identifiers, and validators." },
+      ],
+    },
+  ];
+
+  footerLinks = [
+    { label: "Repository", href: "https://github.com/motxx/anchr" },
+    { label: "Wire spec", href: "https://github.com/motxx/anchr/tree/main/specs" },
+    { label: "Threat model", href: "https://github.com/motxx/anchr/blob/main/docs/threat-model.md" },
+  ];
+
+  installCode = `# Deno
+deno add @anchr/sdk
+
+# npm
+npm i @anchr/sdk`;
+
+  importMapCode = `{
+  "imports": {
+    "@anchr/sdk": "jsr:@anchr/sdk@^0.0.1"
+  }
+}`;
+
+  quickStartCode = `git clone https://github.com/motxx/anchr && cd anchr
+
+NOSTR_RELAYS=wss://your-relay.example \\
+  deno run --allow-net --allow-env examples/quick-start/main.ts`;
+
+  qsExamples = {
+    customer: `import {
+  type CashuProof,
+  createCashuClient,
+  createCustomer,
+  createRelayClient,
+  ProofSchema,
+} from "@anchr/sdk";
+
+const customer = createCustomer({
+  oracles: [{ pubkey: oraclePubkey }],
+  relays: relayUrls,
+  mint: mintUrl,
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
+});
+
+const result = await customer.request({
+  spec: {
+    schema: ProofSchema.TlsnV1,
+    predicate: { target: "https://api.github.com/users/alice" },
+  },
+  payment: { maxAmount: 1000 },
+  fundingProofs: cashuProofsFromYourWallet,
+});
+
+console.log(result.data, result.proof, result.providerPubkey);
+await customer.close();`,
+
+    provider: `import {
+  createCashuClient,
+  createProvider,
+  createRelayClient,
+} from "@anchr/sdk";
+
+const provider = createProvider({
+  oracles: [oraclePubkey],
+  relays: relayUrls,
+  mint: mintUrl,
+  privKey: providerSecretKey,
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
+});
+
+await provider.serve(async (request) => {
+  if (!iWantThisJob(request)) return null;
+
+  return {
+    amountSats: 100,
+    produce: async () => ({
+      data: { /* schema-specific payload */ },
+      proof: "schema-specific-proof",
+    }),
+  };
+});`,
+
+    testing: `import { createCustomer } from "@anchr/sdk";
+import {
+  createInMemoryCashuClient,
+  createInMemoryRelayClient,
+} from "@anchr/sdk/testing";
+
+const cashuClient = createInMemoryCashuClient();
+
+const customer = createCustomer({
+  oracles: [{ pubkey: oraclePubkey }],
+  relays: relayUrls,
+  mint: cashuClient.mintUrl,
+  cashuClient,
+  relayClient: createInMemoryRelayClient(),
+});
+
+// Assert on recorded calls after driving a flow:
+// cashuClient.locks / cashuClient.binds / cashuClient.redeems`,
+  };
+
+  customerRequestCode = `const { data, proof, providerPubkey } = await customer.request({
+  spec: {
+    schema: ProofSchema.TlsnV1,
+    predicate: {
+      target: "https://api.github.com/users/alice",
+      conditions: [{ path: "$.public_repos", op: ">", value: 10 }],
+    },
+  },
+  payment: { maxAmount: 1000 },
+  fundingProofs: cashuProofsFromYourWallet,
+});`;
+
+  oracleWhitelistCode = `const customer = createCustomer({
+  oracles: [{ pubkey: oracleA }, { pubkey: oracleB }],
+  relays: relayUrls,
+  mint: mintUrl,
+  oracleSelector: (oracles) => oracles[1] ?? oracles[0],
+  cashuClient: createCashuClient({ mintUrl }),
+  relayClient: createRelayClient(relayUrls),
+});`;
+
+  providerServeCode = `await provider.serve(async (request) => {
+  if (!iWantThisJob(request)) return null;
+
+  return {
+    amountSats: 100,
+    produce: async () => ({
+      data: { /* schema-specific payload */ },
+      proof: "schema-specific-proof",
+    }),
+  };
+});
+
+await provider.stop();`;
+
+  componentDidMount() {
+    this.handleScroll = () => this.updateActiveSection();
+    window.addEventListener("scroll", this.handleScroll, { passive: true });
+    window.addEventListener("resize", this.handleScroll, { passive: true });
+    this.updateActiveSection();
+  }
+
+  componentWillUnmount() {
+    window.removeEventListener("scroll", this.handleScroll);
+    window.removeEventListener("resize", this.handleScroll);
+    window.clearTimeout(this.copyTimer);
+    this.stop();
+  }
+
+  classNames(...parts) {
+    return parts.filter(Boolean).join(" ");
+  }
+
+  updateActiveSection() {
+    const ids = this.navGroups.flatMap((group) => group.items.map((item) => item.id));
+    const current = ids.reduce((active, id) => {
+      const section = document.getElementById(id);
+      if (!section) return active;
+      return section.getBoundingClientRect().top <= 130 ? id : active;
+    }, ids[0]);
+
+    if (current && current !== this.state.activeSection) {
+      this.setState({ activeSection: current });
+    }
+  }
+
+  copyCode = async (event) => {
+    const button = event.currentTarget;
+    const code = button.closest(".code-panel")?.querySelector("code");
+    if (!code) return;
+
+    const text = code.innerText;
+    let copied = false;
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        copied = true;
+      }
+    } catch (_) {
+      copied = false;
+    }
+
+    if (!copied) {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.inset = "0 auto auto -9999px";
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        copied = document.execCommand("copy");
+      } catch (_) {
+        copied = false;
+      } finally {
+        textarea.remove();
+      }
+    }
+
+    const label = button.getAttribute("data-label") || "Copy";
+    button.textContent = copied ? "Copied" : "Copy failed";
+    window.clearTimeout(this.copyTimer);
+    this.copyTimer = window.setTimeout(() => {
+      button.textContent = label;
+    }, 1400);
+  };
+
+  setStep = (nextStep) => {
+    const count = this.steps.length;
+    this.setState({ step: ((nextStep % count) + count) % count });
+  };
+
+  prev = () => this.setStep(this.state.step - 1);
+
+  next = () => this.setStep(this.state.step + 1);
+
+  stop = () => {
+    if (this.playTimer) {
+      window.clearInterval(this.playTimer);
+      this.playTimer = null;
+    }
+    if (this.state.playing) this.setState({ playing: false });
+  };
+
+  reset = () => {
+    this.stop();
+    this.setState({ step: 0 });
+  };
+
+  togglePlay = () => {
+    if (this.state.playing) {
+      this.stop();
+      return;
+    }
+
+    this.setState({ playing: true });
+    this.playTimer = window.setInterval(() => {
+      if (this.state.step >= this.steps.length - 1) {
+        this.stop();
+        return;
+      }
+      this.setStep(this.state.step + 1);
+    }, 1100);
+  };
+
+  setQsTab = (tab) => () => this.setState({ qsTab: tab });
+
+  renderVals() {
+    const currentStep = this.steps[this.state.step] || this.steps[0];
+    const phaseColor = this.phaseColors[currentStep.phase];
+    const isSelf = currentStep.from === currentStep.to;
+    const progress = Math.round(((this.state.step + 1) / this.steps.length) * 100);
+
+    const navGroups = this.navGroups.map((group) => ({
+      ...group,
+      items: group.items.map((item) => ({
+        ...item,
+        href: `#${item.id}`,
+        className: this.classNames("nav-link", item.id === this.state.activeSection && "is-active"),
+        ariaCurrent: item.id === this.state.activeSection ? "page" : null,
+      })),
+    }));
+
+    const actorPills = this.actors.map((actor) => {
+      const relation = actor === currentStep.from && actor === currentStep.to
+        ? "self"
+        : actor === currentStep.from
+        ? "from"
+        : actor === currentStep.to
+        ? "to"
+        : null;
+
+      return {
+        name: actor,
+        className: this.classNames("actor-pill", relation && `is-${relation}`),
+      };
+    });
+
+    const timeline = this.steps.map((step, index) => ({
+      ...step,
+      number: index + 1,
+      className: this.classNames(
+        "timeline-step",
+        index === this.state.step && "is-active",
+        index < this.state.step && "is-done",
+      ),
+      style: `--phase-color: ${this.phaseColors[step.phase]};`,
+      onClick: () => this.setStep(index),
+    }));
+
+    const qsTabs = [
+      { id: "customer", label: "Customer" },
+      { id: "provider", label: "Provider" },
+      { id: "testing", label: "Testing" },
+    ].map((tab) => ({
+      ...tab,
+      className: this.classNames("tab-button", tab.id === this.state.qsTab && "is-active"),
+      selected: tab.id === this.state.qsTab ? "true" : "false",
+      onClick: this.setQsTab(tab.id),
+    }));
+
+    return {
+      actorPills,
+      copyCode: this.copyCode,
+      featureCards: this.featureCards,
+      footerLinks: this.footerLinks,
+      importMapCode: this.importMapCode,
+      installCode: this.installCode,
+      isExternal: !isSelf,
+      isSelf,
+      navGroups,
+      next: this.next,
+      oracleWhitelistCode: this.oracleWhitelistCode,
+      phaseStyle: `--phase-color: ${phaseColor};`,
+      playLabel: this.state.playing ? "Pause" : "Play",
+      prev: this.prev,
+      progressStyle: `--phase-color: ${phaseColor}; --progress: ${progress}%;`,
+      proofSchemas: this.proofSchemas,
+      providerServeCode: this.providerServeCode,
+      qsCode: this.qsExamples[this.state.qsTab],
+      qsTabs,
+      quickStartCode: this.quickStartCode,
+      referenceTables: this.referenceTables,
+      reset: this.reset,
+      stepFrom: currentStep.from,
+      stepMsg: currentStep.msg,
+      stepNum: this.state.step + 1,
+      stepPhase: currentStep.phase,
+      stepTo: currentStep.to,
+      stepTotal: this.steps.length,
+      timeline,
+      togglePlay: this.togglePlay,
+      trustCards: this.trustCards,
+      version: this.version,
+      customerRequestCode: this.customerRequestCode,
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -112,6 +112,7 @@
     },
     "exclude": [
       "dist/",
+      "docs/sdk/support.js",
       "packages/sdk/dist/",
       "scripts/"
     ]
