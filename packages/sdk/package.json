@@ -25,6 +25,11 @@
       "types": "./dist/sdk/src/oracle.d.ts",
       "import": "./dist/oracle.js",
       "default": "./dist/oracle.js"
+    },
+    "./adapters/cashu-browser": {
+      "types": "./dist/sdk/src/adapters/cashu-browser.d.ts",
+      "import": "./dist/adapters/cashu-browser.js",
+      "default": "./dist/adapters/cashu-browser.js"
     }
   },
   "files": ["dist"],

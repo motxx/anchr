@@ -45,12 +45,12 @@ export function createBrowserCashuClient(
         bind: params,
       });
     },
-    verifyProviderPaymentLock() {
+    async verifyProviderPaymentLock() {
       throw new CashuClientError(
         "browser Cashu client does not verify provider locks",
       );
     },
-    redeemHtlc() {
+    async redeemHtlc() {
       throw new CashuClientError(
         "browser Cashu client does not redeem HTLCs",
       );

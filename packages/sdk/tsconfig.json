@@ -28,6 +28,7 @@
     "src/customer-types.ts",
     "src/provider.ts",
     "src/provider-types.ts",
-    "src/oracle.ts"
+    "src/oracle.ts",
+    "src/adapters/cashu-browser.ts"
   ]
 }

@@ -47,6 +47,7 @@ const result = await Bun.build({
     resolve(packageDir, "src/customer.ts"),
     resolve(packageDir, "src/provider.ts"),
     resolve(packageDir, "src/oracle.ts"),
+    resolve(packageDir, "src/adapters/cashu-browser.ts"),
   ],
   outdir: resolve(packageDir, "dist"),
   target: "node",

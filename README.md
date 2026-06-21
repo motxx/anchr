@@ -98,8 +98,9 @@ also need a notary.
 
 ## Quick Start
 
-From a clean checkout with [Deno](https://deno.com/), Docker Compose, and
-Rust/Cargo installed, run the browser Customer / server Provider example:
+From a clean checkout with [Deno](https://deno.com/), Docker Compose,
+Rust/Cargo, and Chrome or Chromium installed, run the browser Customer /
+server Provider example:
 
 ```sh
 git clone https://github.com/motxx/anchr && cd anchr
