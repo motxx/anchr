@@ -41,10 +41,10 @@ async function main(): Promise<void> {
   const server = await startBrowserCustomerServerProviderExample({
     bundle: true,
   });
-  await assertBundleIsPortable();
 
   let browser: Browser | null = null;
   try {
+    await assertBundleIsPortable();
     const executablePath = await findBrowserExecutable();
     browser = await puppeteer.launch({
       headless: true,
@@ -91,10 +91,13 @@ async function main(): Promise<void> {
       `browser-customer-server-provider smoke passed: amount=${parsed.amount_sats} provider=${parsed.provider_pubkey_prefix}`,
     );
   } finally {
-    if (browser !== null) {
-      await browser.close();
+    try {
+      if (browser !== null) {
+        await browser.close();
+      }
+    } finally {
+      await server.shutdown();
     }
-    await server.shutdown();
   }
 }
 

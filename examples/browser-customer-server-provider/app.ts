@@ -34,6 +34,8 @@ interface ServerStatus {
   latest_error?: string;
 }
 
+const FETCH_TIMEOUT_MS = 10_000;
+
 interface FundingResponse {
   proofs: CashuProof[];
 }
@@ -399,7 +401,7 @@ function readDocumentNodes(): {
 }
 
 async function getJson<T>(url: URL): Promise<T> {
-  const response = await fetch(url);
+  const response = await fetchWithTimeout(url);
   if (!response.ok) {
     throw new Error(`${url.pathname} failed with HTTP ${response.status}`);
   }
@@ -407,7 +409,7 @@ async function getJson<T>(url: URL): Promise<T> {
 }
 
 async function postJson<T>(url: URL, body: unknown): Promise<T> {
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -416,6 +418,19 @@ async function postJson<T>(url: URL, body: unknown): Promise<T> {
     throw new Error(`${url.pathname} failed with HTTP ${response.status}`);
   }
   return await response.json() as T;
+}
+
+async function fetchWithTimeout(
+  url: URL,
+  init: RequestInit = {},
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
 }
 
 function isBrowserServerProviderData(
