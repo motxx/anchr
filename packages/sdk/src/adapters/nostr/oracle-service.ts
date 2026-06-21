@@ -457,12 +457,12 @@ export function createOracleNostrService(
     },
 
     async verifyAndDeliver(
-      queryId,
-      requestEventId,
-      query,
-      result,
-      providerPubkey,
-    ) {
+      queryId: string,
+      requestEventId: string,
+      query: VerifiableRequest,
+      result: RequestSubmissionResult,
+      providerPubkey: string,
+    ): Promise<boolean> {
       const outcome = await dispatchVerifyAndDeliver(
         queryId,
         query,
@@ -474,7 +474,12 @@ export function createOracleNostrService(
       return outcome.passed;
     },
 
-    async verifyAndDeliverWithFrost(queryId, query, result, providerPubkey) {
+    async verifyAndDeliverWithFrost(
+      queryId: string,
+      query: VerifiableRequest,
+      result: RequestSubmissionResult,
+      providerPubkey: string,
+    ): Promise<boolean> {
       const outcome = config.frostNodeConfig === undefined
         ? await rejectQuorumWithoutFrost(queryId, providerPubkey)
         : await verifyAndDeliverWithFrostInternal(
