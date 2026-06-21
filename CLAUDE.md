@@ -55,7 +55,7 @@ single-purpose parts instead.
 
 ## Verification bar
 "Done" = local pass plus CI Docker coverage:
-- `deno task test:all` — lint:strict + cargo dep audit + test:unit +
+- `deno task test:all` — lint:strict + lint:deps (cargo audit) + test:unit +
   test:integration + test:e2e:protocol + test:scripts + test:examples +
   Rust crate gate (clippy + cargo test, all four crates) +
   frost-signer build + test:e2e:frost. Needs the Rust toolchain.

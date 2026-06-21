@@ -3,9 +3,9 @@
 # Enable with: deno task setup:hooks
 # (which runs `git config core.hooksPath scripts/git-hooks`)
 #
-# Runs the local, non-Docker test gauntlet — lint:strict + dep audit +
-# unit + integration + protocol + frost + scripts + examples + Rust crate
-# gate. Docker-backed e2e remains in CI by default; run
+# Runs the local, non-Docker test gauntlet — lint:strict + lint:deps
+# (cargo audit) + unit + integration + protocol + frost + scripts +
+# examples + Rust crate gate. Docker-backed e2e remains in CI by default; run
 # `deno task test:all:docker` explicitly when you need it locally.
 #
 # Iteration-window bypass: if test:all passed within the last 2
