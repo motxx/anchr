@@ -344,7 +344,8 @@ async function handleRequestUnsafe(
     return jsonResponse({ proofs });
   }
   if (request.method === "POST" && url.pathname === "/relay/publish") {
-    const event = await request.json() as NostrEvent;
+    const event = await parseRelayPublishEvent(request);
+    if (event instanceof Response) return event;
     return jsonResponse(await ctx.bridgeRelayClient.publish(event));
   }
   if (request.method === "GET" && url.pathname === "/relay/subscribe") {
@@ -396,7 +397,9 @@ function serveRelaySubscription(
 }
 
 function parseRelayFilter(filterText: string | null): Filter | Response {
-  if (filterText === null) return {};
+  if (filterText === null) {
+    return jsonResponse({ error: "filter query parameter is required" }, 400);
+  }
   let parsed: unknown;
   try {
     parsed = JSON.parse(filterText);
@@ -406,7 +409,87 @@ function parseRelayFilter(filterText: string | null): Filter | Response {
   if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
     return jsonResponse({ error: "filter must be a JSON object" }, 400);
   }
-  return parsed as Filter;
+  if (!isRelayFilter(parsed)) {
+    return jsonResponse({ error: "filter has unsupported fields" }, 400);
+  }
+  return parsed;
+}
+
+async function parseRelayPublishEvent(
+  request: Request,
+): Promise<NostrEvent | Response> {
+  let parsed: unknown;
+  try {
+    parsed = await request.json();
+  } catch {
+    return jsonResponse({ error: "event must be valid JSON" }, 400);
+  }
+  if (!isNostrEvent(parsed)) {
+    return jsonResponse({ error: "event must be a Nostr event object" }, 400);
+  }
+  return parsed;
+}
+
+function isRelayFilter(value: unknown): value is Filter {
+  if (!isPlainRecord(value)) return false;
+  for (const [key, filterValue] of Object.entries(value)) {
+    if (key.startsWith("#")) {
+      if (!isStringArray(filterValue)) return false;
+      continue;
+    }
+    if (
+      key !== "kinds" &&
+      key !== "authors" &&
+      key !== "ids" &&
+      key !== "since" &&
+      key !== "until" &&
+      key !== "limit"
+    ) {
+      return false;
+    }
+  }
+  return isOptionalNumberArray(value.kinds) &&
+    isOptionalStringArray(value.authors) &&
+    isOptionalStringArray(value.ids) &&
+    isOptionalNumber(value.since) &&
+    isOptionalNumber(value.until) &&
+    isOptionalNumber(value.limit);
+}
+
+function isNostrEvent(value: unknown): value is NostrEvent {
+  return isPlainRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.pubkey === "string" &&
+    typeof value.created_at === "number" &&
+    typeof value.kind === "number" &&
+    Array.isArray(value.tags) &&
+    value.tags.every((tag) =>
+      Array.isArray(tag) && tag.every((item) => typeof item === "string")
+    ) &&
+    typeof value.content === "string" &&
+    typeof value.sig === "string";
+}
+
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isOptionalStringArray(value: unknown): boolean {
+  return value === undefined || isStringArray(value);
+}
+
+function isOptionalNumberArray(value: unknown): boolean {
+  return value === undefined ||
+    (Array.isArray(value) && value.every((item) => typeof item === "number"));
+}
+
+function isOptionalNumber(value: unknown): boolean {
+  return value === undefined || typeof value === "number";
+}
+
+function isStringArray(value: unknown): boolean {
+  return Array.isArray(value) &&
+    value.every((item) => typeof item === "string");
 }
 
 async function proxyMintRequest(
