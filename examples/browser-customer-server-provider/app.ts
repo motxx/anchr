@@ -127,7 +127,7 @@ async function runExample(): Promise<BrowserServerProviderResult> {
       provider_pubkey_prefix: status.provider_pubkey_prefix,
       payment_lock_token_prefix: result.paymentLockToken.slice(0, 24),
       payment_lock_proof_count: result.paymentLockProofs.length,
-      proof_bytes: result.proof.length,
+      proof_bytes: decodedBase64ByteLength(result.proof),
       schema: result.schema,
       data: result.data,
     };
@@ -145,7 +145,7 @@ function createHttpRelayClient(baseUrl: URL): RelayClient {
       const url = new URL("relay/subscribe", baseUrl);
       url.searchParams.set("filter", JSON.stringify(filter));
       const source = new EventSource(url);
-      source.onopen = () => onEose?.();
+      source.addEventListener("eose", () => onEose?.());
       source.onmessage = (message) => {
         const event = JSON.parse(message.data);
         onEvent(event);
@@ -160,6 +160,12 @@ function createHttpRelayClient(baseUrl: URL): RelayClient {
       // Each browser subscription owns its EventSource; there is no shared pool.
     },
   };
+}
+
+function decodedBase64ByteLength(value: string): number {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=");
+  return atob(padded).length;
 }
 
 function createBrowserCashuClient(mintUrl: string): CashuClient {

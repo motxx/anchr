@@ -14,6 +14,7 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       oracle,
       provider.publicKey,
       "query_1",
+      "request_1",
       "deadbeef".repeat(8),
     );
 
@@ -34,6 +35,7 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       oracle,
       provider.publicKey,
       "query_2",
+      "request_2",
       preimage,
     );
     const parsed = parseOracleDM(
@@ -45,6 +47,7 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
     expect(parsed?.type).toBe("preimage");
     if (parsed?.type !== "preimage") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_2");
+    expect(parsed.request_event_id).toBe("request_2");
     expect(parsed.preimage).toBe(preimage);
   });
 
@@ -94,6 +97,7 @@ describe("NIP-44 DM (Oracle ↔ Provider)", () => {
       oracle,
       provider.publicKey,
       "query_5",
+      "request_5",
       "secret_preimage",
     );
 

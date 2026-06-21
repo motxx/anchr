@@ -121,6 +121,7 @@ describe("FROST DM building and parsing", () => {
       oracle,
       provider.publicKey,
       "query_compat_1",
+      "request_compat_1",
       preimage,
     );
     const parsed = parseOracleDM(
@@ -132,6 +133,7 @@ describe("FROST DM building and parsing", () => {
     expect(parsed?.type).toBe("preimage");
     if (parsed?.type !== "preimage") throw new Error("unreachable");
     expect(parsed.query_id).toBe("query_compat_1");
+    expect(parsed.request_event_id).toBe("request_compat_1");
     expect(parsed.preimage).toBe(preimage);
   });
 

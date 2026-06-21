@@ -364,9 +364,9 @@ function serveRelaySubscription(
 ): Response {
   const url = new URL(request.url);
   const filterText = url.searchParams.get("filter");
-  const filter = typeof filterText === "string"
-    ? JSON.parse(filterText) as Filter
-    : {};
+  const parsedFilter = parseRelayFilter(filterText);
+  if (parsedFilter instanceof Response) return parsedFilter;
+  const filter = parsedFilter;
   const encoder = new TextEncoder();
   let subscription: Subscription | null = null;
 
@@ -377,9 +377,9 @@ function serveRelaySubscription(
           encoder.encode(`data: ${JSON.stringify(event)}\n\n`),
         );
       }, () => {
-        controller.enqueue(encoder.encode(": eose\n\n"));
+        controller.enqueue(encoder.encode("event: eose\ndata: {}\n\n"));
       });
-      controller.enqueue(encoder.encode(": connected\n\n"));
+      controller.enqueue(encoder.encode("event: connected\ndata: {}\n\n"));
     },
     cancel() {
       subscription?.close();
@@ -396,6 +396,20 @@ function serveRelaySubscription(
       "content-type": "text/event-stream",
     },
   });
+}
+
+function parseRelayFilter(filterText: string | null): Filter | Response {
+  if (filterText === null) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(filterText);
+  } catch {
+    return jsonResponse({ error: "filter must be valid JSON" }, 400);
+  }
+  if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+    return jsonResponse({ error: "filter must be a JSON object" }, 400);
+  }
+  return parsed as Filter;
 }
 
 async function proxyMintRequest(

@@ -542,6 +542,7 @@ function waitForPreimage(
       );
       if (oracleDm?.type !== "preimage") return null;
       if (oracleDm.query_id !== queryId) return null;
+      if (oracleDm.request_event_id !== requestEventId) return null;
       return oracleDm.preimage;
     },
     ctx.preimageTimeoutMs,

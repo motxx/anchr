@@ -195,6 +195,7 @@ export function createOracleNostrService(
       const outcome = await dispatchVerifyAndDeliver(
         queryId,
         entry.query,
+        entry.queryEventId,
         result,
         event.pubkey,
       );
@@ -225,6 +226,7 @@ export function createOracleNostrService(
   async function verifyAndDeliverInternal(
     queryId: string,
     query: VerifiableRequest,
+    requestEventId: string,
     result: RequestSubmissionResult,
     providerPubkey: string,
   ): Promise<DeliveryOutcome> {
@@ -237,6 +239,7 @@ export function createOracleNostrService(
         config.identity,
         providerPubkey,
         queryId,
+        requestEventId,
         preimage,
       );
 
@@ -366,6 +369,7 @@ export function createOracleNostrService(
   async function dispatchVerifyAndDeliver(
     queryId: string,
     query: VerifiableRequest,
+    requestEventId: string,
     result: RequestSubmissionResult,
     providerPubkey: string,
   ): Promise<DeliveryOutcome> {
@@ -387,7 +391,13 @@ export function createOracleNostrService(
         config.frostNodeConfig,
       );
     }
-    return verifyAndDeliverInternal(queryId, query, result, providerPubkey);
+    return verifyAndDeliverInternal(
+      queryId,
+      query,
+      requestEventId,
+      result,
+      providerPubkey,
+    );
   }
 
   function unwatchRequest(queryId: string): void {
@@ -449,6 +459,7 @@ export function createOracleNostrService(
       const outcome = await dispatchVerifyAndDeliver(
         queryId,
         query,
+        queryId,
         result,
         providerPubkey,
       );

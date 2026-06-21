@@ -24,11 +24,13 @@ export function buildPreimageDM(
   oracleIdentity: NostrIdentity,
   providerPubKey: string,
   queryId: string,
+  requestEventId: string,
   preimage: string,
 ): VerifiedEvent {
   const payload: PreimageDMPayload = {
     type: "preimage",
     query_id: queryId,
+    request_event_id: requestEventId,
     preimage,
   };
 
@@ -123,7 +125,8 @@ function isOracleDMPayload(value: unknown): value is OracleDMPayload {
   if (typeof value.query_id !== "string") return false;
   switch (value.type) {
     case "preimage":
-      return typeof value.preimage === "string";
+      return typeof value.request_event_id === "string" &&
+        typeof value.preimage === "string";
     case "rejection":
       return typeof value.reason === "string";
     case "frost_signature":

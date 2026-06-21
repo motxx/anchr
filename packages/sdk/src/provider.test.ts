@@ -1001,6 +1001,14 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
     { ...oracleKey, secretKeyHex: bytesToHex(oracleKey.secretKey) },
     providerKey.publicKey,
     "q-redeem",
+    "old-request-event",
+    "ee".repeat(32),
+  ));
+  (onPreimageEvent as (e: Event) => void)(buildPreimageDM(
+    { ...oracleKey, secretKeyHex: bytesToHex(oracleKey.secretKey) },
+    providerKey.publicKey,
+    "q-redeem",
+    requestEvent.id,
     "ff".repeat(32),
   ));
 

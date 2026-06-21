@@ -9,6 +9,7 @@
 export interface PreimageDMPayload {
   type: "preimage";
   query_id: string;
+  request_event_id: string;
   preimage: string;
 }
 
