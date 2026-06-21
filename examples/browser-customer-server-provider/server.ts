@@ -588,22 +588,27 @@ async function generatePresentation(
   const presentationPath =
     `/tmp/anchr-browser-example-${crypto.randomUUID()}.presentation.tlsn`;
 
-  for (let attempt = 1; attempt <= PROVER_ATTEMPTS; attempt++) {
-    try {
-      return await runProverOnce(targetUrl, verifierHost, presentationPath);
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      if (
-        attempt === PROVER_ATTEMPTS ||
-        !isRetryableProverFailure(lastError.message)
-      ) {
-        throw lastError;
+  try {
+    for (let attempt = 1; attempt <= PROVER_ATTEMPTS; attempt++) {
+      try {
+        return await runProverOnce(targetUrl, verifierHost, presentationPath);
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        await removeFileIfExists(presentationPath);
+        if (
+          attempt === PROVER_ATTEMPTS ||
+          !isRetryableProverFailure(lastError.message)
+        ) {
+          throw lastError;
+        }
+        await delay(500 * attempt);
       }
-      await delay(500 * attempt);
     }
-  }
 
-  throw lastError ?? new Error("TLSN prover failed without an error");
+    throw lastError ?? new Error("TLSN prover failed without an error");
+  } finally {
+    await removeFileIfExists(presentationPath);
+  }
 }
 
 async function runProverOnce(
@@ -627,6 +632,14 @@ async function runProverOnce(
     throw new Error(`TLSN prover failed: ${decode(output.stderr)}`);
   }
   return decode(output.stdout).trim();
+}
+
+async function removeFileIfExists(path: string): Promise<void> {
+  try {
+    await Deno.remove(path);
+  } catch (error) {
+    if (!(error instanceof Deno.errors.NotFound)) throw error;
+  }
 }
 
 async function assertRealStackReady(config: {

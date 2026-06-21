@@ -78,6 +78,9 @@ async function runExample(): Promise<BrowserServerProviderResult> {
   const funding = await getJson<FundingResponse>(
     new URL(`funding-proofs?amount=${config.funding_amount_sats}`, baseUrl),
   );
+  const settlementBaseline = await getJson<ServerStatus>(
+    new URL("status", baseUrl),
+  );
   const customer = createCustomer({
     oracles: [{ pubkey: config.oracle_pubkey }],
     relays: [config.relay_url],
@@ -97,8 +100,9 @@ async function runExample(): Promise<BrowserServerProviderResult> {
       },
       payment: { maxAmount: config.provider_amount_sats },
       fundingProofs: funding.proofs,
+      provider: config.provider_pubkey,
     });
-    const status = await waitForServerSettlement(baseUrl);
+    const status = await waitForServerSettlement(baseUrl, settlementBaseline);
 
     if (typeof result.proof !== "string") {
       throw new Error("expected base64 TLSNotary presentation proof");
@@ -294,18 +298,25 @@ function bytesToHex(bytes: Uint8Array): string {
   );
 }
 
-async function waitForServerSettlement(baseUrl: URL): Promise<ServerStatus> {
+async function waitForServerSettlement(
+  baseUrl: URL,
+  baseline: ServerStatus,
+): Promise<ServerStatus> {
   const startedAt = Date.now();
   let latest: ServerStatus | null = null;
   while (Date.now() - startedAt <= 120_000) {
     latest = await getJson<ServerStatus>(new URL("status", baseUrl));
     if (
-      latest.oracle_verification_pass_count >= 1 &&
-      latest.provider_redeem_count >= 1
+      latest.oracle_verification_pass_count >
+        baseline.oracle_verification_pass_count &&
+      latest.provider_redeem_count > baseline.provider_redeem_count
     ) {
       return latest;
     }
-    if (latest.oracle_verification_fail_count > 0) {
+    if (
+      latest.oracle_verification_fail_count >
+        baseline.oracle_verification_fail_count
+    ) {
       throw new Error(
         latest.latest_error ?? "Oracle rejected the TLSNotary presentation",
       );

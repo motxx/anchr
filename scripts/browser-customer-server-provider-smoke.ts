@@ -165,21 +165,45 @@ async function findBrowserExecutable(): Promise<string | undefined> {
   const candidates: string[] = [
     "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
     "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/snap/bin/chromium",
   ];
   if (home !== undefined) {
     candidates.push(
-      ...await findExecutableFiles(`${home}/.cache/puppeteer/chrome`, 8),
-      ...await findExecutableFiles(
-        `${home}/.cache/puppeteer/chrome-headless-shell`,
-        8,
-      ),
+      ...[
+        ...await findExecutableFiles(`${home}/.cache/puppeteer/chrome`, 8),
+        ...await findExecutableFiles(
+          `${home}/.cache/puppeteer/chrome-headless-shell`,
+          8,
+        ),
+      ].sort().reverse(),
     );
   }
+  candidates.push(...pathBrowserCandidates(Deno.env.get("PATH")));
 
-  for (const candidate of candidates.sort().reverse()) {
+  for (const candidate of new Set(candidates)) {
     if (await isFile(candidate)) return candidate;
   }
   return undefined;
+}
+
+function pathBrowserCandidates(pathValue: string | undefined): string[] {
+  if (pathValue === undefined) return [];
+  const executableNames = [
+    "google-chrome",
+    "google-chrome-stable",
+    "chromium",
+    "chromium-browser",
+  ];
+  return pathValue
+    .split(":")
+    .filter((directory) => directory.length > 0)
+    .flatMap((directory) =>
+      executableNames.map((name) => `${directory}/${name}`)
+    );
 }
 
 async function findExecutableFiles(

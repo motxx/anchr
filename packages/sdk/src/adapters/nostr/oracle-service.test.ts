@@ -5,6 +5,7 @@ import {
   createOracleNostrService,
   createOracleNostrServiceFromEnv,
 } from "./oracle-service.ts";
+import { parseOracleDM } from "./events/dm.ts";
 import type { OracleNostrServiceConfig } from "./oracle-service.ts";
 import { generateEphemeralIdentity } from "../../identity.ts";
 import { makeQuery } from "../../testing/factories.ts";
@@ -106,11 +107,23 @@ describe("verifyAndDeliver", () => {
       payment_status: "escrow_swapped" as const,
     };
 
-    const passed = await service.verifyAndDeliver("q1", query, {
-      attachments: [],
-    }, providerPubkey);
+    const passed = await service.verifyAndDeliver(
+      "q1",
+      "request-event-q1",
+      query,
+      { attachments: [] },
+      providerPubkey,
+    );
     expect(passed).toBe(true);
     expect(published.length).toBe(1);
+    const dm = parseOracleDM(
+      published[0]!.content,
+      providerIdentity.secretKey,
+      config.identity.publicKey,
+    );
+    expect(dm?.type).toBe("preimage");
+    if (dm?.type !== "preimage") throw new Error("unreachable");
+    expect(dm.request_event_id).toBe("request-event-q1");
     // Preimage should be deleted from store after delivery
     expect(await store.has(hash)).toBe(false);
   });
@@ -142,6 +155,7 @@ describe("verifyAndDeliver", () => {
 
     const passed = await service.verifyAndDeliver(
       "q-delivery-fail",
+      "request-event-delivery-fail",
       query,
       { attachments: [] },
       providerPubkey,
@@ -172,9 +186,13 @@ describe("verifyAndDeliver", () => {
       payment_status: "escrow_swapped" as const,
     };
 
-    const passed = await service.verifyAndDeliver("q1", query, {
-      attachments: [],
-    }, providerPubkey);
+    const passed = await service.verifyAndDeliver(
+      "q1",
+      "request-event-q1",
+      query,
+      { attachments: [] },
+      providerPubkey,
+    );
     expect(passed).toBe(false);
     expect(published.length).toBe(1);
   });
@@ -195,9 +213,13 @@ describe("verifyAndDeliver", () => {
     };
 
     // Verify passes but no preimage exists, so rejection DM is sent
-    const passed = await service.verifyAndDeliver("q_unknown", query, {
-      attachments: [],
-    }, providerPubkey);
+    const passed = await service.verifyAndDeliver(
+      "q_unknown",
+      "request-event-unknown",
+      query,
+      { attachments: [] },
+      providerPubkey,
+    );
     expect(passed).toBe(false);
   });
 });
