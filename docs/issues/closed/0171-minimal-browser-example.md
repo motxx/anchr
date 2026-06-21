@@ -1,4 +1,4 @@
-# Minimal browser example
+# Browser customer/server provider example
 
 Created: 2026-06-21
 Model: GPT-5 Codex
@@ -18,20 +18,19 @@ Blocks:
 
 ## Summary
 
-Add the smallest maintained example that proves Anchr's documented portable
-surface runs inside a real browser runtime. The repository currently documents a
-browser-safe package boundary and has targeted browser-related tests, but the
-maintained examples are Deno-run examples; none gives a user a browser page and
-a smoke command that demonstrates the portable imports actually execute in a
-browser.
+Add the maintained example that proves Anchr's browser Customer surface can
+settle a real two-party transaction against a server Provider. The example
+should run a browser page, Docker Nostr relay, regtest Lightning/Cashu mint,
+SDK Oracle, and TLSNotary verifier path so implementers can copy a practical
+integration boundary instead of a mock flow.
 
 ## Rationale
 
-`docs/architecture.md` defines the browser-host boundary: the full
-`@anchr/protocol` surface plus the documented portable SDK subpaths may be used
-without process, filesystem, environment, or sidecar ownership. The example
-should make that contract observable with a real browser smoke harness, without
-expanding package ownership or importing server-only SDK adapters.
+`docs/architecture.md` defines the browser-host boundary: the browser owns the
+Customer flow and must not import process, filesystem, environment, sidecar, or
+server-only SDK adapters. The shipped example makes that boundary observable
+with a real browser smoke harness while the Deno server owns Provider,
+Oracle, mint proxy, relay bridge, and TLSN sidecar orchestration.
 
 Relevant files:
 
@@ -44,14 +43,15 @@ Relevant files:
 
 ## Acceptance
 
-- A new `examples/<name>/` entry demonstrates Anchr code executing inside a real
-  browser page, not only under Deno, Node, or a DOM shim.
-- The example is intentionally minimal: it proves import, signing/event or
-  schema helper behavior, and visible browser-side success without relays,
-  mints, notaries, sidecars, credentials, funded tokens, or private proof data.
-- Browser-facing code imports only `@anchr/protocol` and the SDK subpaths
-  documented as portable in `docs/architecture.md`; it does not import the root
-  `@anchr/sdk` barrel or server-only adapters.
+- A new `examples/browser-customer-server-provider/` entry demonstrates Anchr
+  Customer code executing inside a real browser page, not only under Deno,
+  Node, or a DOM shim.
+- The example proves an end-to-end browser Customer / server Provider payment
+  flow with the Docker relay, regtest Lightning/Cashu mint, SDK Oracle, and
+  TLSNotary proof path.
+- Browser-facing code imports only portable SDK subpaths and direct browser-safe
+  dependencies; it does not import the root `@anchr/sdk` barrel or server-only
+  SDK adapters.
 - The example has a README that states status, user flow, dependencies,
   non-production boundary, and the command that proves browser execution.
 - `examples/README.md` lists the example with its status and check command if
@@ -62,15 +62,15 @@ Relevant files:
 
 ## Verification
 
-- `deno task -c examples/<name>/deno.json smoke`
+- `deno task -c examples/browser-customer-server-provider/deno.json smoke`
 - `deno task test`
 - `deno task test:examples`
 - `deno task lint:strict`
 - Manual check: start the Docker stack and TLSN binaries, open the example URL
   in a browser, and observe the documented success state after Oracle
   verification and Provider HTLC redemption.
-- No matches are expected: `rg -n "from [\"']@anchr/sdk[\"']|@anchr/sdk/(adapters/nostr|adapters/oracle-service|payments|proofs|attachments)" examples/<name>/`
-- No matches are expected: `rg -n "\\b(Deno|process|node:)\\b" examples/<name>/`
+- No matches are expected: `rg -n "from [\"']@anchr/sdk[\"']|@anchr/sdk/(adapters/nostr|adapters/oracle-service|payments|proofs|attachments)" examples/browser-customer-server-provider/app.ts`
+- No matches are expected: `rg -n "\\b(Deno|process|node:)\\b" examples/browser-customer-server-provider/dist/app.js`
 
 ## Plan
 
