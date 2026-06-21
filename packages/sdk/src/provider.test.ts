@@ -9,6 +9,7 @@ import {
 } from "./provider.ts";
 import {
   buildHashResponseEvent,
+  buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
 } from "@anchr/protocol/events";
@@ -1030,6 +1031,137 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   const parsed = JSON.parse(stored) as Record<string, unknown>;
   expect(parsed.status).toBe("redeemed");
   expect(parsed.queryId).toBe("q-redeem");
+  expect(parsed.responseEventId).toBe(published[2].id);
+});
+
+test("Provider.serve redeems protocol oracle preimage delivery events", async () => {
+  const published: Event[] = [];
+  let onRequestEvent: ((e: Event) => void) | null = null;
+  let onSelectionEvent: ((e: Event) => void) | null = null;
+  let onHashEvent: ((e: Event) => void) | null = null;
+  let onPreimageEvent: ((e: Event) => void) | null = null;
+  const redeemRecorder: { params: RedeemHtlcParams | null } = { params: null };
+  const stateStore = createMemoryStateStore();
+
+  const relayClient = makeRelayClient({
+    subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
+      const kinds = filter.kinds ?? [];
+      if (kinds.includes(5300)) onRequestEvent = onEvent;
+      else if (kinds.includes(7000)) onSelectionEvent = onEvent;
+      else if (kinds.includes(4)) {
+        const recipients = filter["#p"] ?? [];
+        if (recipients.includes(providerKey.publicKey)) {
+          onPreimageEvent = onEvent;
+        } else {
+          onHashEvent = onEvent;
+        }
+      }
+      return { close: () => {} };
+    },
+    publish: async (event: Event): Promise<PublishResult> => {
+      published.push(event);
+      if (event.kind === 4) {
+        queueMicrotask(() => {
+          onHashEvent?.(buildHashResponseEvent(
+            oracleKey,
+            event.pubkey,
+            {
+              type: "hash_response",
+              query_id: "q-protocol-redeem",
+              hash: "aa".repeat(32),
+            },
+          ));
+        });
+      }
+      return { successes: ["wss://relay.example.org"], failures: [] };
+    },
+  });
+
+  const cashuClient = makeCashuClient({
+    redeemHtlc: async (p: RedeemHtlcParams): Promise<RedeemResult> => {
+      redeemRecorder.params = p;
+      return { proofs: [], amountSats: 200 };
+    },
+  });
+
+  const provider = createProvider({
+    ...validOptions(),
+    oracles: [oracleKey.publicKey],
+    relayClient,
+    cashuClient,
+    stateStore,
+    selectionTimeoutMs: 200,
+    hashTimeoutMs: 200,
+    preimageTimeoutMs: 200,
+  });
+  const servePromise = provider.serve(async () => ({
+    amountSats: 200,
+    produce: async () => ({ data: { ok: true }, proof: "p1" }),
+  }));
+
+  await new Promise((r) => setTimeout(r, 5));
+  if (onRequestEvent === null) {
+    throw new Error("request subscribe was not called");
+  }
+  const fireRequest = onRequestEvent as (e: Event) => void;
+
+  const requestEvent = buildQueryRequestEvent(customerKey, {
+    query_id: "q-protocol-redeem",
+    schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
+    customer_pubkey: customerKey.publicKey,
+    oracle_pubkey: oracleKey.publicKey,
+    max_amount_sats: 1000,
+    expires_at: Date.now() + 60_000,
+  });
+  fireRequest(requestEvent);
+
+  await new Promise((r) => setTimeout(r, 30));
+  if (onSelectionEvent === null) {
+    throw new Error("selection subscribe was not called");
+  }
+  (onSelectionEvent as (e: Event) => void)(buildSelectionFeedbackEvent(
+    customerKey,
+    requestEvent.id,
+    {
+      status: "processing",
+      selected_provider_pubkey: providerKey.publicKey,
+      provider_redemption_token: "cashuBprotocol",
+      execution: selectionExecution(),
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 30));
+  if (onPreimageEvent === null) {
+    throw new Error("preimage subscribe was not called");
+  }
+  (onPreimageEvent as (e: Event) => void)(buildPreimageDeliveryEvent(
+    oracleKey,
+    providerKey.publicKey,
+    {
+      query_id: "q-protocol-redeem",
+      request_event_id: requestEvent.id,
+      preimage: "dd".repeat(32),
+    },
+  ));
+
+  await new Promise((r) => setTimeout(r, 30));
+  await provider.stop();
+  await servePromise;
+
+  expect(redeemRecorder.params).not.toBe(null);
+  if (redeemRecorder.params === null) throw new Error("unreachable");
+  expect(redeemRecorder.params.token).toBe("cashuBprotocol");
+  expect(redeemRecorder.params.preimageHex).toBe("dd".repeat(32));
+  expect(redeemRecorder.params.providerSecretKey).toEqual(
+    providerKey.secretKey,
+  );
+
+  const stored = await stateStore.get(`provider:${requestEvent.id}`);
+  expect(stored).not.toBe(null);
+  if (stored === null) throw new Error("provider state was not stored");
+  const parsed = JSON.parse(stored) as Record<string, unknown>;
+  expect(parsed.status).toBe("redeemed");
+  expect(parsed.queryId).toBe("q-protocol-redeem");
   expect(parsed.responseEventId).toBe(published[2].id);
 });
 

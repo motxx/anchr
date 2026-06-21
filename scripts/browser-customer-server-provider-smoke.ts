@@ -45,7 +45,7 @@ async function main(): Promise<void> {
   let browser: Browser | null = null;
   try {
     await assertBundleIsPortable();
-    const executablePath = await findBrowserExecutable();
+    const executablePath = await requireBrowserExecutable();
     browser = await puppeteer.launch({
       headless: true,
       executablePath,
@@ -188,6 +188,14 @@ async function findBrowserExecutable(): Promise<string | undefined> {
     if (await isFile(candidate)) return candidate;
   }
   return undefined;
+}
+
+async function requireBrowserExecutable(): Promise<string> {
+  const executablePath = await findBrowserExecutable();
+  if (executablePath !== undefined) return executablePath;
+  throw new Error(
+    "Chrome/Chromium executable not found. Install Chrome/Chromium or set PUPPETEER_EXECUTABLE_PATH to the browser binary.",
+  );
 }
 
 function pathBrowserCandidates(pathValue: string | undefined): string[] {

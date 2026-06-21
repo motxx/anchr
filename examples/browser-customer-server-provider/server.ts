@@ -582,8 +582,10 @@ async function generatePresentation(
   verifierHost: string,
 ): Promise<string> {
   let lastError: Error | undefined;
-  const presentationPath =
-    `/tmp/anchr-browser-example-${crypto.randomUUID()}.presentation.tlsn`;
+  const presentationPath = await Deno.makeTempFile({
+    prefix: "anchr-browser-example-",
+    suffix: ".presentation.tlsn",
+  });
 
   try {
     for (let attempt = 1; attempt <= PROVER_ATTEMPTS; attempt++) {
