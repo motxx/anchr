@@ -49,7 +49,7 @@ export async function bindProviderPaymentLock(params: {
   bind: BindProviderParams;
 }): Promise<CashuToken> {
   const p = params.bind;
-  validateHashHex(p.hashHex);
+  const normalizedHash = validateHashHex(p.hashHex);
   validateLocktime(p.locktimeSeconds);
   if (
     !Number.isFinite(p.amountSats) ||
@@ -84,7 +84,7 @@ export async function bindProviderPaymentLock(params: {
     );
   }
 
-  const phase2 = buildHtlcP2PKOptions(p);
+  const phase2 = buildHtlcP2PKOptions(p, normalizedHash);
   const customerPrivkeyHex = bytesToHexLocal(p.customerSecretKey);
 
   let keep: Proof[];
@@ -105,6 +105,7 @@ export async function bindProviderPaymentLock(params: {
     keep = result.keep ?? [];
     send = result.send;
   } catch (err) {
+    if (err instanceof CashuClientError) throw err;
     throw new CashuMintError("bindProvider: mint swap failed", err);
   }
 
@@ -131,9 +132,12 @@ function bytesToHexLocal(bytes: Uint8Array): string {
   return s;
 }
 
-function buildHtlcP2PKOptions(p: BindProviderParams): P2PKOptions {
+function buildHtlcP2PKOptions(
+  p: BindProviderParams,
+  hashHex: string,
+): P2PKOptions {
   return buildHtlcFinalOptions({
-    hash: p.hashHex,
+    hash: hashHex,
     providerPubkey: p.providerPubkey,
     customerRefundPubkey: p.customerPubkey,
     locktimeSeconds: p.locktimeSeconds,

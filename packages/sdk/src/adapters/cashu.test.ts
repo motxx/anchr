@@ -97,6 +97,7 @@ function makeFakeWallet(opts: {
   fee?: number;
   /** Keyset IDs the fake wallet knows. Defaults to ["00ad268c4d1f5826"]. */
   keysetIds?: readonly string[];
+  omitIncludeFees?: boolean;
 }): { wallet: CashuWalletAdapter; calls: SendCall[]; loadMintCalls: number[] } {
   const calls: SendCall[] = [];
   const loadMintCalls: number[] = [];
@@ -116,16 +117,18 @@ function makeFakeWallet(opts: {
             call.privkey = k;
             return chain;
           },
-          includeFees(on = true) {
-            call.includeFees = on;
-            return chain;
-          },
           run() {
             if (opts.errorOnSend) return Promise.reject(opts.errorOnSend);
             const out = outputs[outputIdx++] ?? opts.outputProofs ?? [];
             return Promise.resolve({ send: out, keep: opts.keepProofs ?? [] });
           },
         };
+        if (opts.omitIncludeFees !== true) {
+          chain.includeFees = (on = true) => {
+            call.includeFees = on;
+            return chain;
+          };
+        }
         return chain;
       },
     },
@@ -608,11 +611,12 @@ test("bindProvider performs one fee-covered mint swap for the selected Provider 
   });
 
   const lockTime = FUTURE_LOCKTIME();
+  const mixedCaseHash = VALID_HASH.toUpperCase();
   const result = await client.bindProvider({
     amountSats: 1000,
     fundingProofs: VALID_FUNDING_PROOFS,
     providerPubkey: PROVIDER_PUBKEY,
-    hashHex: VALID_HASH,
+    hashHex: mixedCaseHash,
     locktimeSeconds: lockTime,
     customerPubkey: CUSTOMER_PUBKEY,
     customerSecretKey: CUSTOMER_SECRET,
@@ -630,6 +634,7 @@ test("bindProvider performs one fee-covered mint swap for the selected Provider 
   expect(calls[0].p2pk).toBeDefined();
   const tagsJson = JSON.stringify(calls[0].p2pk);
   expect(tagsJson).toContain(VALID_HASH);
+  expect(tagsJson).not.toContain(mixedCaseHash);
   expect(tagsJson).toContain(PROVIDER_PUBKEY);
   expect(tagsJson).toContain(CUSTOMER_PUBKEY);
   expect(tagsJson).toContain(String(lockTime));
@@ -769,6 +774,29 @@ test("bindProvider wraps mint errors in CashuMintError", async () => {
       customerSecretKey: CUSTOMER_SECRET,
     }),
   ).rejects.toThrow(CashuMintError);
+});
+
+test("bindProvider does not wrap SDK validation errors as mint failures", async () => {
+  const { wallet } = makeFakeWallet({
+    outputProofs: [],
+    fee: 2,
+    omitIncludeFees: true,
+  });
+  const client = createCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+  await expect(
+    client.bindProvider({
+      amountSats: 1000,
+      hashHex: VALID_HASH,
+      fundingProofs: VALID_FUNDING_PROOFS,
+      providerPubkey: PROVIDER_PUBKEY,
+      customerPubkey: CUSTOMER_PUBKEY,
+      locktimeSeconds: FUTURE_LOCKTIME(),
+      customerSecretKey: CUSTOMER_SECRET,
+    }),
+  ).rejects.toThrow(CashuClientError);
 });
 
 test("bindProvider rejects a missing or wrong-shape customerSecretKey", async () => {

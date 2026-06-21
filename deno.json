@@ -52,7 +52,7 @@
   },
   "unstable": ["sloppy-imports", "detect-cjs"],
   "tasks": {
-    "check": "deno check packages/ e2e/ scripts/ examples/browser-customer-server-provider/app.ts",
+    "check": "deno check packages/ e2e/ scripts/ examples/browser-customer-server-provider/app.ts examples/browser-customer-server-provider/server.ts",
     "test": "deno task test:unit && deno task test:integration && deno task test:e2e:protocol && deno task test:scripts && deno task test:examples",
     "publish:dry-run": "deno publish --dry-run --allow-dirty --config packages/protocol/deno.json && deno publish --dry-run --allow-dirty --config packages/sdk/deno.json",
     "test:unit": "deno test packages/ --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys '--ignore=**/*.integration.test.ts'",
