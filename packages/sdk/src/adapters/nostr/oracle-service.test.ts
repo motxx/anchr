@@ -180,6 +180,21 @@ describe("verifyAndDeliver", () => {
     )).rejects.toThrow("requires watchRequest");
   });
 
+  test("four-argument signature rejects malformed requests", async () => {
+    const service = createOracleNostrService(
+      makeConfig({ verify: verifyPass }),
+    );
+
+    const call = Reflect.apply(service.verifyAndDeliver, service, [
+      "q-malformed",
+      { status: "processing" },
+      { attachments: [] },
+      providerPubkey,
+    ]);
+
+    await expect(call).rejects.toThrow("invalid verifyAndDeliver arguments");
+  });
+
   test("returns false and retains preimage when delivery fails", async () => {
     const store = createPreimageStore();
     const failingRelay = makeCapturingRelay(() => ({

@@ -459,6 +459,7 @@ export function createOracleNostrService(
     }
 
     if (
+      !isVerifiableRequest(requestEventIdOrQuery) ||
       !isRequestSubmissionResult(queryOrResult) ||
       typeof resultOrProviderPubkey !== "string"
     ) {
