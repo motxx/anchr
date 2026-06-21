@@ -111,7 +111,7 @@ export interface OracleNostrService {
   recordSelectedProvider(requestId: string, providerPubkey: string): void;
   /** Verify a result and deliver preimage or rejection. */
   verifyAndDeliver(
-    requestId: string,
+    queryId: string,
     requestEventId: string,
     request: VerifiableRequest,
     result: RequestSubmissionResult,
@@ -119,7 +119,7 @@ export interface OracleNostrService {
   ): Promise<boolean>;
   /** Verify and deliver using FROST signing (P2PK+FROST flow). */
   verifyAndDeliverWithFrost(
-    requestId: string,
+    queryId: string,
     request: VerifiableRequest,
     result: RequestSubmissionResult,
     providerPubkey: string,
