@@ -16,29 +16,17 @@ jobs:
   claude:
     if: |
       (
-        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude') &&
-          (github.event.comment.author_association == 'OWNER' ||
-           github.event.comment.author_association == 'MEMBER' ||
-           github.event.comment.author_association == 'COLLABORATOR')) ||
-        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude') &&
-          (github.event.comment.author_association == 'OWNER' ||
-           github.event.comment.author_association == 'MEMBER' ||
-           github.event.comment.author_association == 'COLLABORATOR')) ||
-        (github.event_name == 'pull_request_review' && contains(github.event.review.body, '@claude') &&
-          (github.event.review.author_association == 'OWNER' ||
-           github.event.review.author_association == 'MEMBER' ||
-           github.event.review.author_association == 'COLLABORATOR')) ||
+        (github.event_name == 'issue_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'pull_request_review' && contains(github.event.review.body || '', '@claude')) ||
         (github.event_name == 'issues' &&
-          (contains(github.event.issue.body, '@claude') || contains(github.event.issue.title, '@claude')) &&
-          (github.event.issue.author_association == 'OWNER' ||
-           github.event.issue.author_association == 'MEMBER' ||
-           github.event.issue.author_association == 'COLLABORATOR'))
+          (contains(github.event.issue.body || '', '@claude') || contains(github.event.issue.title, '@claude')))
       )
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      pull-requests: read
-      issues: read
+      pull-requests: write
+      issues: write
       id-token: write
       actions: read # Required for Claude to read CI results on PRs
     steps:
@@ -46,6 +34,18 @@ jobs:
         uses: step-security/harden-runner@a5ad31d6a139d249332a2605b85202e8c0b78450 # v2.19.1
         with:
           egress-policy: audit
+
+      - name: Check collaborator write permission
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          actor="${{ github.actor }}"
+          perm=$(gh api "repos/${{ github.repository }}/collaborators/${actor}/permission" \
+            --jq '.permission' 2>/dev/null || echo "none")
+          if [[ "$perm" != "admin" && "$perm" != "write" ]]; then
+            echo "Actor ${actor} has '${perm}' permission; write or admin required." >&2
+            exit 1
+          fi
 
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
