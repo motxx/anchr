@@ -373,6 +373,120 @@ function requireOnEvent(
   return onEvent;
 }
 
+const TEST_EVENT_TIMEOUT_MS = 1_000;
+
+interface Deferred<T> {
+  promise: Promise<T>;
+  resolve(value: T): void;
+}
+
+function createDeferred<T>(): Deferred<T> {
+  let resolveValue: ((value: T) => void) | null = null;
+  const promise = new Promise<T>((resolve) => {
+    resolveValue = resolve;
+  });
+  if (resolveValue === null) {
+    throw new Error("deferred resolve was not initialized");
+  }
+  return { promise, resolve: resolveValue };
+}
+
+async function waitForPromise<T>(
+  promise: Promise<T>,
+  message: string,
+  timeoutMs = TEST_EVENT_TIMEOUT_MS,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<never>((_resolve, reject) => {
+        timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== null) clearTimeout(timeoutId);
+  }
+}
+
+interface EventSubscriptionProbe {
+  set(onEvent: (e: Event) => void): void;
+  wait(name: string): Promise<(e: Event) => void>;
+}
+
+function createEventSubscriptionProbe(): EventSubscriptionProbe {
+  let current: ((e: Event) => void) | null = null;
+  let resolved = false;
+  const ready = createDeferred<(e: Event) => void>();
+
+  return {
+    set(onEvent: (e: Event) => void): void {
+      current = onEvent;
+      if (!resolved) {
+        resolved = true;
+        ready.resolve(onEvent);
+      }
+    },
+    wait(name: string): Promise<(e: Event) => void> {
+      if (current !== null) return Promise.resolve(current);
+      return waitForPromise(ready.promise, `${name} subscribe was not called`);
+    },
+  };
+}
+
+interface ProviderStateWithStatus {
+  status: unknown;
+}
+
+interface RedeemedProviderState extends ProviderStateWithStatus {
+  queryId: unknown;
+  responseEventId: unknown;
+}
+
+function hasProviderStateStatus(
+  value: unknown,
+): value is ProviderStateWithStatus {
+  return typeof value === "object" && value !== null && "status" in value;
+}
+
+function hasRedeemedProviderState(
+  value: unknown,
+): value is RedeemedProviderState {
+  return hasProviderStateStatus(value) &&
+    "queryId" in value &&
+    "responseEventId" in value;
+}
+
+function parseProviderStateStatus(value: string): ProviderStateWithStatus {
+  const parsed: unknown = JSON.parse(value);
+  if (!hasProviderStateStatus(parsed)) {
+    throw new Error("invalid provider state shape");
+  }
+  return parsed;
+}
+
+function parseRedeemedProviderState(value: string): RedeemedProviderState {
+  const parsed: unknown = JSON.parse(value);
+  if (!hasRedeemedProviderState(parsed)) {
+    throw new Error("invalid provider redeemed state shape");
+  }
+  return parsed;
+}
+
+function createObservedStateStore(
+  onSet: (key: string, value: string) => void,
+): ActorStateStore {
+  const stateStore = createMemoryStateStore();
+  return {
+    get: (key) => stateStore.get(key),
+    set: async (key, value) => {
+      await stateStore.set(key, value);
+      onSet(key, value);
+    },
+    delete: (key) => stateStore.delete(key),
+  };
+}
+
 test("Provider.serve publishes a kind 7000 offer when handler returns a ProviderOffer", async () => {
   const published: Event[] = [];
   let onEventRef: ((e: Event) => void) | null = null;
@@ -899,22 +1013,27 @@ test("Provider.serve ignores selection whose Payment Lock token amount differs f
 
 test("Provider.serve receives oracle preimage DM and redeems the HTLC", async () => {
   const published: Event[] = [];
-  let onRequestEvent: ((e: Event) => void) | null = null;
-  let onSelectionEvent: ((e: Event) => void) | null = null;
+  const requestEvents = createEventSubscriptionProbe();
+  const selectionEvents = createEventSubscriptionProbe();
+  const preimageEvents = createEventSubscriptionProbe();
   let onHashEvent: ((e: Event) => void) | null = null;
-  let onPreimageEvent: ((e: Event) => void) | null = null;
-  const redeemRecorder: { params: RedeemHtlcParams | null } = { params: null };
-  const stateStore = createMemoryStateStore();
+  const redeemed = createDeferred<RedeemHtlcParams>();
+  const redeemedState = createDeferred<{ key: string; value: string }>();
+  const stateStore = createObservedStateStore((key, value) => {
+    if (parseProviderStateStatus(value).status === "redeemed") {
+      redeemedState.resolve({ key, value });
+    }
+  });
 
   const relayClient = makeRelayClient({
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
       const kinds = filter.kinds ?? [];
-      if (kinds.includes(5300)) onRequestEvent = onEvent;
-      else if (kinds.includes(7000)) onSelectionEvent = onEvent;
+      if (kinds.includes(5300)) requestEvents.set(onEvent);
+      else if (kinds.includes(7000)) selectionEvents.set(onEvent);
       else if (kinds.includes(4)) {
         const recipients = filter["#p"] ?? [];
         if (recipients.includes(providerKey.publicKey)) {
-          onPreimageEvent = onEvent;
+          preimageEvents.set(onEvent);
         } else {
           onHashEvent = onEvent;
         }
@@ -942,7 +1061,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
 
   const cashuClient = makeCashuClient({
     redeemHtlc: async (p: RedeemHtlcParams): Promise<RedeemResult> => {
-      redeemRecorder.params = p;
+      redeemed.resolve(p);
       return { proofs: [], amountSats: 200 };
     },
   });
@@ -962,11 +1081,7 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
     produce: async () => ({ data: { ok: true }, proof: "p1" }),
   }));
 
-  await new Promise((r) => setTimeout(r, 5));
-  if (onRequestEvent === null) {
-    throw new Error("request subscribe was not called");
-  }
-  const fireRequest = onRequestEvent as (e: Event) => void;
+  const fireRequest = await requestEvents.wait("request");
 
   // Customer sends a request bound to our (real) oracle.
   const requestEvent = buildQueryRequestEvent(customerKey, {
@@ -979,11 +1094,8 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   });
   fireRequest(requestEvent);
 
-  await new Promise((r) => setTimeout(r, 30));
-  if (onSelectionEvent === null) {
-    throw new Error("selection subscribe was not called");
-  }
-  (onSelectionEvent as (e: Event) => void)(buildSelectionFeedbackEvent(
+  const fireSelection = await selectionEvents.wait("selection");
+  fireSelection(buildSelectionFeedbackEvent(
     customerKey,
     requestEvent.id,
     {
@@ -994,18 +1106,15 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
     },
   ));
 
-  await new Promise((r) => setTimeout(r, 30));
-  if (onPreimageEvent === null) {
-    throw new Error("preimage subscribe was not called");
-  }
-  (onPreimageEvent as (e: Event) => void)(buildPreimageDM(
+  const firePreimage = await preimageEvents.wait("preimage");
+  firePreimage(buildPreimageDM(
     { ...oracleKey, secretKeyHex: bytesToHex(oracleKey.secretKey) },
     providerKey.publicKey,
     "q-redeem",
     "old-request-event",
     "ee".repeat(32),
   ));
-  (onPreimageEvent as (e: Event) => void)(buildPreimageDM(
+  firePreimage(buildPreimageDM(
     { ...oracleKey, secretKeyHex: bytesToHex(oracleKey.secretKey) },
     providerKey.publicKey,
     "q-redeem",
@@ -1013,22 +1122,25 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
     "ff".repeat(32),
   ));
 
-  await new Promise((r) => setTimeout(r, 30));
+  const storedState = await waitForPromise(
+    redeemedState.promise,
+    "provider did not store redeemed state",
+  );
   await provider.stop();
   await servePromise;
 
-  expect(redeemRecorder.params).not.toBe(null);
-  if (redeemRecorder.params === null) throw new Error("unreachable");
-  expect(redeemRecorder.params.token).toBe("cashuBbound");
-  expect(redeemRecorder.params.preimageHex).toBe("ff".repeat(32));
-  expect(redeemRecorder.params.providerSecretKey).toEqual(
+  const redeemParams = await waitForPromise(
+    redeemed.promise,
+    "provider did not redeem HTLC",
+  );
+  expect(redeemParams.token).toBe("cashuBbound");
+  expect(redeemParams.preimageHex).toBe("ff".repeat(32));
+  expect(redeemParams.providerSecretKey).toEqual(
     providerKey.secretKey,
   );
 
-  const stored = await stateStore.get(`provider:${requestEvent.id}`);
-  expect(stored).not.toBe(null);
-  if (stored === null) throw new Error("provider state was not stored");
-  const parsed = JSON.parse(stored) as Record<string, unknown>;
+  expect(storedState.key).toBe(`provider:${requestEvent.id}`);
+  const parsed = parseRedeemedProviderState(storedState.value);
   expect(parsed.status).toBe("redeemed");
   expect(parsed.queryId).toBe("q-redeem");
   expect(parsed.responseEventId).toBe(published[2].id);
@@ -1036,22 +1148,27 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
 
 test("Provider.serve redeems protocol oracle preimage delivery events", async () => {
   const published: Event[] = [];
-  let onRequestEvent: ((e: Event) => void) | null = null;
-  let onSelectionEvent: ((e: Event) => void) | null = null;
+  const requestEvents = createEventSubscriptionProbe();
+  const selectionEvents = createEventSubscriptionProbe();
+  const preimageEvents = createEventSubscriptionProbe();
   let onHashEvent: ((e: Event) => void) | null = null;
-  let onPreimageEvent: ((e: Event) => void) | null = null;
-  const redeemRecorder: { params: RedeemHtlcParams | null } = { params: null };
-  const stateStore = createMemoryStateStore();
+  const redeemed = createDeferred<RedeemHtlcParams>();
+  const redeemedState = createDeferred<{ key: string; value: string }>();
+  const stateStore = createObservedStateStore((key, value) => {
+    if (parseProviderStateStatus(value).status === "redeemed") {
+      redeemedState.resolve({ key, value });
+    }
+  });
 
   const relayClient = makeRelayClient({
     subscribe: (filter: Filter, onEvent: (e: Event) => void): Subscription => {
       const kinds = filter.kinds ?? [];
-      if (kinds.includes(5300)) onRequestEvent = onEvent;
-      else if (kinds.includes(7000)) onSelectionEvent = onEvent;
+      if (kinds.includes(5300)) requestEvents.set(onEvent);
+      else if (kinds.includes(7000)) selectionEvents.set(onEvent);
       else if (kinds.includes(4)) {
         const recipients = filter["#p"] ?? [];
         if (recipients.includes(providerKey.publicKey)) {
-          onPreimageEvent = onEvent;
+          preimageEvents.set(onEvent);
         } else {
           onHashEvent = onEvent;
         }
@@ -1079,7 +1196,7 @@ test("Provider.serve redeems protocol oracle preimage delivery events", async ()
 
   const cashuClient = makeCashuClient({
     redeemHtlc: async (p: RedeemHtlcParams): Promise<RedeemResult> => {
-      redeemRecorder.params = p;
+      redeemed.resolve(p);
       return { proofs: [], amountSats: 200 };
     },
   });
@@ -1099,11 +1216,7 @@ test("Provider.serve redeems protocol oracle preimage delivery events", async ()
     produce: async () => ({ data: { ok: true }, proof: "p1" }),
   }));
 
-  await new Promise((r) => setTimeout(r, 5));
-  if (onRequestEvent === null) {
-    throw new Error("request subscribe was not called");
-  }
-  const fireRequest = onRequestEvent as (e: Event) => void;
+  const fireRequest = await requestEvents.wait("request");
 
   const requestEvent = buildQueryRequestEvent(customerKey, {
     query_id: "q-protocol-redeem",
@@ -1115,11 +1228,8 @@ test("Provider.serve redeems protocol oracle preimage delivery events", async ()
   });
   fireRequest(requestEvent);
 
-  await new Promise((r) => setTimeout(r, 30));
-  if (onSelectionEvent === null) {
-    throw new Error("selection subscribe was not called");
-  }
-  (onSelectionEvent as (e: Event) => void)(buildSelectionFeedbackEvent(
+  const fireSelection = await selectionEvents.wait("selection");
+  fireSelection(buildSelectionFeedbackEvent(
     customerKey,
     requestEvent.id,
     {
@@ -1130,11 +1240,8 @@ test("Provider.serve redeems protocol oracle preimage delivery events", async ()
     },
   ));
 
-  await new Promise((r) => setTimeout(r, 30));
-  if (onPreimageEvent === null) {
-    throw new Error("preimage subscribe was not called");
-  }
-  (onPreimageEvent as (e: Event) => void)(buildPreimageDeliveryEvent(
+  const firePreimage = await preimageEvents.wait("preimage");
+  firePreimage(buildPreimageDeliveryEvent(
     oracleKey,
     providerKey.publicKey,
     {
@@ -1144,22 +1251,25 @@ test("Provider.serve redeems protocol oracle preimage delivery events", async ()
     },
   ));
 
-  await new Promise((r) => setTimeout(r, 30));
+  const storedState = await waitForPromise(
+    redeemedState.promise,
+    "provider did not store redeemed state",
+  );
   await provider.stop();
   await servePromise;
 
-  expect(redeemRecorder.params).not.toBe(null);
-  if (redeemRecorder.params === null) throw new Error("unreachable");
-  expect(redeemRecorder.params.token).toBe("cashuBprotocol");
-  expect(redeemRecorder.params.preimageHex).toBe("dd".repeat(32));
-  expect(redeemRecorder.params.providerSecretKey).toEqual(
+  const redeemParams = await waitForPromise(
+    redeemed.promise,
+    "provider did not redeem HTLC",
+  );
+  expect(redeemParams.token).toBe("cashuBprotocol");
+  expect(redeemParams.preimageHex).toBe("dd".repeat(32));
+  expect(redeemParams.providerSecretKey).toEqual(
     providerKey.secretKey,
   );
 
-  const stored = await stateStore.get(`provider:${requestEvent.id}`);
-  expect(stored).not.toBe(null);
-  if (stored === null) throw new Error("provider state was not stored");
-  const parsed = JSON.parse(stored) as Record<string, unknown>;
+  expect(storedState.key).toBe(`provider:${requestEvent.id}`);
+  const parsed = parseRedeemedProviderState(storedState.value);
   expect(parsed.status).toBe("redeemed");
   expect(parsed.queryId).toBe("q-protocol-redeem");
   expect(parsed.responseEventId).toBe(published[2].id);
