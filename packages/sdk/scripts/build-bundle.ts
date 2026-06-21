@@ -17,7 +17,7 @@ interface BunBuildHandle {
 interface BunBuildConfig {
   entrypoints: readonly string[];
   outdir: string;
-  target: "node";
+  target: "browser" | "node";
   plugins: readonly BunBuildPlugin[];
 }
 
@@ -41,33 +41,53 @@ const aliases = new Map<string, string>([
   ["@anchr/protocol/types", "../protocol/src/types.ts"],
 ]);
 
-const result = await Bun.build({
-  entrypoints: [
+const plugins: readonly BunBuildPlugin[] = [
+  {
+    name: "anchr-workspace-aliases",
+    setup(build) {
+      build.onResolve({ filter: /^@anchr\// }, (args) => {
+        const target = aliases.get(args.path);
+        if (!target) return undefined;
+        return { path: resolve(packageDir, target) };
+      });
+    },
+  },
+];
+
+async function buildBundle(
+  entrypoints: readonly string[],
+  target: BunBuildConfig["target"],
+): Promise<void> {
+  const result = await Bun.build({
+    entrypoints,
+    outdir: resolve(packageDir, "dist"),
+    target,
+    plugins,
+  });
+
+  if (!result.success) {
+    for (const log of result.logs) {
+      process.stderr.write(`${log}\n`);
+    }
+    process.exit(1);
+  }
+}
+
+await buildBundle(
+  [
     resolve(packageDir, "src/index.ts"),
+    resolve(packageDir, "src/adapters/mod.ts"),
     resolve(packageDir, "src/customer.ts"),
     resolve(packageDir, "src/provider.ts"),
     resolve(packageDir, "src/oracle.ts"),
+    resolve(packageDir, "src/schema.ts"),
+  ],
+  "node",
+);
+
+await buildBundle(
+  [
     resolve(packageDir, "src/adapters/cashu-browser.ts"),
   ],
-  outdir: resolve(packageDir, "dist"),
-  target: "node",
-  plugins: [
-    {
-      name: "anchr-workspace-aliases",
-      setup(build) {
-        build.onResolve({ filter: /^@anchr\// }, (args) => {
-          const target = aliases.get(args.path);
-          if (!target) return undefined;
-          return { path: resolve(packageDir, target) };
-        });
-      },
-    },
-  ],
-});
-
-if (!result.success) {
-  for (const log of result.logs) {
-    process.stderr.write(`${log}\n`);
-  }
-  process.exit(1);
-}
+  "browser",
+);

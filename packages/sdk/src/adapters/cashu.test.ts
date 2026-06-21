@@ -22,6 +22,7 @@ import {
   validateHashHex,
   validateLocktime,
 } from "./cashu.ts";
+import { createBrowserCashuClient } from "./cashu-browser.ts";
 
 const PREIMAGE_HEX = "ffeeddcc".repeat(8);
 const VALID_HASH = bytesToHex(sha256(hexToBytes(PREIMAGE_HEX)));
@@ -581,6 +582,71 @@ test("verifyProviderPaymentLock compares single-value tags by position", async (
 
 test("createCashuClient rejects an empty mint URL", () => {
   expect(() => createCashuClient({ mintUrl: "" })).toThrow(CashuClientError);
+});
+
+test("createBrowserCashuClient rejects an empty mint URL", () => {
+  expect(() => createBrowserCashuClient({ mintUrl: "" })).toThrow(
+    CashuClientError,
+  );
+});
+
+test("createBrowserCashuClient delegates bindProvider to the browser wallet", async () => {
+  const providerOutput: Proof[] = [
+    {
+      id: "00ad268c4d1f5826",
+      amount: 16,
+      secret: '["HTLC",{"data":"' + VALID_HASH + '"}]',
+      C: "02" + "dd".repeat(32),
+    },
+  ];
+  const { wallet, calls } = makeFakeWallet({
+    outputProofs: providerOutput,
+  });
+  const client = createBrowserCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+
+  const result = await client.bindProvider({
+    amountSats: 16,
+    fundingProofs: VALID_FUNDING_PROOFS,
+    providerPubkey: PROVIDER_PUBKEY,
+    hashHex: VALID_HASH,
+    locktimeSeconds: FUTURE_LOCKTIME(),
+    customerPubkey: CUSTOMER_PUBKEY,
+    customerSecretKey: CUSTOMER_SECRET,
+  });
+
+  expect(result.amountSats).toBe(16);
+  expect(result.proofs).toEqual(providerOutput);
+  expect(result.token.startsWith("cashu")).toBe(true);
+  expect(calls.length).toBe(1);
+  expect(calls[0].amount).toBe(16);
+  expect(calls[0].includeFees).toBe(true);
+  expect(calls[0].p2pk).toBeDefined();
+});
+
+test("createBrowserCashuClient rejects unsupported server-side methods asynchronously", async () => {
+  const { wallet } = makeFakeWallet({ outputProofs: [] });
+  const client = createBrowserCashuClient({
+    mintUrl: "https://mint.example.org",
+    wallet,
+  });
+
+  await expect(client.verifyProviderPaymentLock({
+    token: "cashu-test",
+    amountSats: 16,
+    hashHex: VALID_HASH,
+    providerPubkey: PROVIDER_PUBKEY,
+    customerPubkey: CUSTOMER_PUBKEY,
+    locktimeSeconds: FUTURE_LOCKTIME(),
+  })).rejects.toThrow(CashuClientError);
+
+  await expect(client.redeemHtlc({
+    token: "cashu-test",
+    preimageHex: PREIMAGE_HEX,
+    providerSecretKey: PROVIDER_SECRET,
+  })).rejects.toThrow(CashuClientError);
 });
 
 test("bindProvider performs one fee-covered mint swap for the selected Provider amount", async () => {

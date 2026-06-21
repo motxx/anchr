@@ -11,6 +11,11 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./adapters": {
+      "types": "./dist/sdk/src/adapters/mod.d.ts",
+      "import": "./dist/adapters/mod.js",
+      "default": "./dist/adapters/mod.js"
+    },
     "./customer": {
       "types": "./dist/sdk/src/customer.d.ts",
       "import": "./dist/customer.js",
@@ -26,10 +31,15 @@
       "import": "./dist/oracle.js",
       "default": "./dist/oracle.js"
     },
+    "./schema": {
+      "types": "./dist/sdk/src/schema.d.ts",
+      "import": "./dist/schema.js",
+      "default": "./dist/schema.js"
+    },
     "./adapters/cashu-browser": {
       "types": "./dist/sdk/src/adapters/cashu-browser.d.ts",
-      "import": "./dist/adapters/cashu-browser.js",
-      "default": "./dist/adapters/cashu-browser.js"
+      "import": "./dist/cashu-browser.js",
+      "default": "./dist/cashu-browser.js"
     }
   },
   "files": ["dist"],

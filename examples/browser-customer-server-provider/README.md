@@ -2,10 +2,10 @@
 
 Status: Implemented
 
-Run a browser `createCustomer()` against a server-side `createProvider()`.
-The browser creates the Customer request and the Cashu HTLC Payment Lock. The
-server runs the Provider and an SDK Nostr Oracle. Docker provides the Nostr
-relay, regtest Lightning/Cashu mint, and TLSN verifier server.
+Run a browser `createCustomer()` against a server-side `createProvider()`. The
+browser creates the Customer request and the Cashu HTLC Payment Lock. The server
+runs the Provider and an SDK Nostr Oracle. Docker provides the Nostr relay,
+regtest Lightning/Cashu mint, and TLSN verifier server.
 
 ## User Flow
 
@@ -21,6 +21,7 @@ only after the Provider redeems the HTLC at the regtest Cashu mint.
 Real dependencies:
 
 - Deno
+- Chrome or Chromium for the browser smoke check
 - Docker Compose services from the repository root:
   - `relay`
   - `tlsn-verifier`
@@ -63,13 +64,13 @@ Then open the printed local URL.
   HTTP/SSE endpoint is only a browser transport bridge to that relay.
 - Mint: both actors use the same regtest Cashu mint. The browser reaches it
   through the server's `/mint` same-origin proxy.
-- Oracle: `createOracleNostrService()` verifies the Provider result and
-  releases the HTLC preimage over Nostr DM.
+- Oracle: `createOracleNostrService()` verifies the Provider result and releases
+  the HTLC preimage over Nostr DM.
 - Proof: the Provider runs the TLSN prover against the Docker verifier server;
   the Oracle verifies the presentation with the local TLSN verifier binary.
 
 ## Non-Production Boundary
 
 This is a local regtest example. It demonstrates the browser/server Anchr
-integration and real settlement path, but it is not mainnet custody guidance,
-a production Oracle deployment, or a production relay/mint runbook.
+integration and real settlement path, but it is not mainnet custody guidance, a
+production Oracle deployment, or a production relay/mint runbook.

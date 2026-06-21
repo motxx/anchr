@@ -70,6 +70,7 @@ const RESULT_MESSAGE = "browser customer paid server provider";
 const PROVIDER_AMOUNT_SATS = 16;
 const CUSTOMER_FUNDING_SATS = 64;
 const PROVER_ATTEMPTS = 3;
+const PROVER_TIMEOUT_MS = 120_000;
 
 export async function startBrowserCustomerServerProviderExample(
   options: ExampleServerOptions = {},
@@ -709,7 +710,25 @@ async function runProverOnce(
     stdout: "piped",
     stderr: "piped",
   });
-  const output = await command.output();
+  const child = command.spawn();
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    try {
+      child.kill("SIGKILL");
+    } catch {
+      // The process may have exited between the timeout firing and kill.
+    }
+  }, PROVER_TIMEOUT_MS);
+  let output: Deno.CommandOutput;
+  try {
+    output = await child.output();
+  } finally {
+    clearTimeout(timeout);
+  }
+  if (timedOut) {
+    throw new Error(`TLSN prover timed out after ${PROVER_TIMEOUT_MS}ms`);
+  }
   if (output.code !== 0) {
     throw new Error(`TLSN prover failed: ${decode(output.stderr)}`);
   }

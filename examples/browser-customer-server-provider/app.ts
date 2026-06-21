@@ -28,6 +28,7 @@ interface ServerStatus {
 }
 
 const FETCH_TIMEOUT_MS = 10_000;
+const FUNDING_FETCH_TIMEOUT_MS = 120_000;
 
 interface FundingResponse {
   proofs: CashuProof[];
@@ -70,6 +71,7 @@ async function runExample(): Promise<BrowserServerProviderResult> {
   const cashuClient = createBrowserCashuClient({ mintUrl: config.mint_url });
   const funding = await getJson<FundingResponse>(
     new URL(`funding-proofs?amount=${config.funding_amount_sats}`, baseUrl),
+    { timeoutMs: FUNDING_FETCH_TIMEOUT_MS },
   );
   const settlementBaseline = await getJson<ServerStatus>(
     new URL("status", baseUrl),
@@ -280,20 +282,27 @@ function readDocumentNodes(): {
   };
 }
 
-async function getJson<T>(url: URL): Promise<T> {
-  const response = await fetchWithTimeout(url);
+async function getJson<T>(
+  url: URL,
+  options: { timeoutMs?: number } = {},
+): Promise<T> {
+  const response = await fetchWithTimeout(url, {}, options.timeoutMs);
   if (!response.ok) {
     throw new Error(`${url.pathname} failed with HTTP ${response.status}`);
   }
   return await response.json() as T;
 }
 
-async function postJson<T>(url: URL, body: unknown): Promise<T> {
+async function postJson<T>(
+  url: URL,
+  body: unknown,
+  options: { timeoutMs?: number } = {},
+): Promise<T> {
   const response = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }, options.timeoutMs);
   if (!response.ok) {
     throw new Error(`${url.pathname} failed with HTTP ${response.status}`);
   }
@@ -303,9 +312,10 @@ async function postJson<T>(url: URL, body: unknown): Promise<T> {
 async function fetchWithTimeout(
   url: URL,
   init: RequestInit = {},
+  timeoutMs = FETCH_TIMEOUT_MS,
 ): Promise<Response> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     return await fetch(url, { ...init, signal: controller.signal });
   } finally {
