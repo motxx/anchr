@@ -98,22 +98,22 @@ also need a notary.
 
 ## Quick Start
 
-From a clean checkout (with [Deno](https://deno.com/) installed), publish a
-Request Notice to a relay you choose and read it back:
+From a clean checkout (with [Deno](https://deno.com/) installed), run the
+browser Customer / server Provider example:
 
 ```sh
 git clone https://github.com/motxx/anchr && cd anchr
-NOSTR_RELAYS=wss://your-relay.example deno run --allow-net --allow-env examples/quick-start/main.ts
+deno task -c examples/browser-customer-server-provider/deno.json stack:up
+deno task -c examples/browser-customer-server-provider/deno.json stack:init
+cargo build --manifest-path crates/tlsn-prover/Cargo.toml
+cargo build --release --manifest-path crates/tlsn-verifier/Cargo.toml
+deno task -c examples/browser-customer-server-provider/deno.json smoke
 ```
 
-The command builds a kind `5300` Request Notice with the SDK under a fresh
-ephemeral keypair, publishes it to your relay, and prints the notice the relay
-echoes back. No payment is locked: the notice carries only
-public discovery fields, and the full payment-locked exchange is the
-[`paid-request-simulation`](examples/paid-request-simulation/) lesson. A
-deterministic smoke test covers the same code path in CI without contacting
-any third-party relay (see
-[`examples/quick-start/`](examples/quick-start/)).
+The command builds a browser bundle, starts a local Deno server running
+`createProvider()`, opens a real browser running `createCustomer()`, and asserts
+that the Customer receives a TLSNotary-backed result while the Provider redeems
+a real regtest Cashu HTLC.
 
 ## Customer API Sketch
 
@@ -176,8 +176,7 @@ Status labels are defined in
 
 | Example | Status | Lesson |
 | --- | --- | --- |
-| [`quick-start`](examples/quick-start/) | Testnet | Publish a Request Notice to a real relay with SDK-built events and read it back. |
-| [`paid-request-simulation`](examples/paid-request-simulation/) | Simulation | Compose Customer, Provider, Oracle, payment, proof, attachment, and adapter boundaries through public SDK imports. |
+| [`browser-customer-server-provider`](examples/browser-customer-server-provider/) | Implemented | Run browser `createCustomer()` against server `createProvider()` with Docker Nostr relay, regtest Cashu mint, SDK Oracle, and TLSNotary proof verification. |
 
 New examples must be tiny lessons for verifiable paid requests and must use
 only `@anchr/sdk` or `@anchr/protocol` for Anchr imports.

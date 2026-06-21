@@ -1,0 +1,15 @@
+{
+  "name": "@anchr-examples/browser-customer-server-provider",
+  "version": "0.0.0",
+  "exports": {
+    "./server": "./server.ts"
+  },
+  "tasks": {
+    "bundle": "deno bundle --platform browser --config ../../deno.json app.ts -o dist/app.js",
+    "stack:up": "bash -c 'cd ../.. && docker compose up -d relay tlsn-verifier bitcoind lnd-mint lnd-user cashu-mint'",
+    "stack:init": "bash -c 'cd ../.. && ./scripts/init-regtest.sh && docker compose restart cashu-mint'",
+    "stack:down": "bash -c 'cd ../.. && docker compose down'",
+    "serve": "deno run --allow-net --allow-read --allow-write --allow-run --allow-env server.ts",
+    "smoke": "deno run --allow-all ../../scripts/browser-customer-server-provider-smoke.ts"
+  }
+}

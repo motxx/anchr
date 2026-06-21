@@ -1,0 +1,137 @@
+:root {
+  color-scheme: light;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+    "Segoe UI", sans-serif;
+  color: #17201c;
+  background: #eef3ef;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+.shell {
+  width: min(960px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 48px 0;
+}
+
+.summary,
+.result {
+  border: 1px solid #cbd8cf;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.summary {
+  padding: 28px;
+}
+
+.eyebrow {
+  margin: 0 0 10px;
+  color: #4c6b5a;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+h1 {
+  margin: 0;
+  font-size: 2rem;
+  line-height: 1.15;
+  letter-spacing: 0;
+}
+
+.facts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin: 24px 0 0;
+  overflow: hidden;
+  border: 1px solid #dce5df;
+  border-radius: 8px;
+  background: #dce5df;
+}
+
+.facts div {
+  min-width: 0;
+  padding: 14px;
+  background: #f8faf8;
+}
+
+dt {
+  color: #607466;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+dd {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.92rem;
+}
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #e7edf8;
+  color: #274b82;
+  font-weight: 700;
+}
+
+.status[data-status="pass"] {
+  background: #ddf5e7;
+  color: #17623a;
+}
+
+.status[data-status="fail"] {
+  background: #fce5e2;
+  color: #983326;
+}
+
+.result {
+  margin-top: 18px;
+}
+
+pre {
+  margin: 0;
+  min-height: 180px;
+  overflow: auto;
+  padding: 18px;
+  color: #22312a;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: min(100vw - 24px, 560px);
+    padding: 24px 0;
+  }
+
+  .summary {
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.55rem;
+  }
+
+  .facts {
+    grid-template-columns: 1fr;
+  }
+}

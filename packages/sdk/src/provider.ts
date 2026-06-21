@@ -26,6 +26,7 @@ import {
   normalizeSecretKey,
 } from "@anchr/protocol/nostr";
 import { getPublicKey } from "nostr-tools/pure";
+import { parseOracleDM } from "./adapters/nostr/events/dm.ts";
 import type {
   ProofGenerator,
   ProviderHandler,
@@ -526,11 +527,22 @@ function waitForPreimage(
         ctx.identity.secretKey,
         oraclePubkey,
       );
-      if (parsed === null) return null;
-      // Cross-check both ids so a stale DM for another request can't be replayed.
-      if (parsed.query_id !== queryId) return null;
-      if (parsed.request_event_id !== requestEventId) return null;
-      return parsed.preimage;
+      if (
+        parsed !== null &&
+        parsed.query_id === queryId &&
+        parsed.request_event_id === requestEventId
+      ) {
+        return parsed.preimage;
+      }
+
+      const oracleDm = parseOracleDM(
+        event.content,
+        ctx.identity.secretKey,
+        oraclePubkey,
+      );
+      if (oracleDm?.type !== "preimage") return null;
+      if (oracleDm.query_id !== queryId) return null;
+      return oracleDm.preimage;
     },
     ctx.preimageTimeoutMs,
   ).result;

@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Anchr Browser Customer / Server Provider</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <main class="shell" aria-labelledby="title">
+      <section class="summary">
+        <p class="eyebrow">Anchr split-runtime example</p>
+        <h1 id="title">Browser Customer pays a server Provider</h1>
+        <dl class="facts">
+          <div>
+            <dt>Status</dt>
+            <dd><span class="status" data-status="pending">pending</span></dd>
+          </div>
+          <div>
+            <dt>Customer</dt>
+            <dd data-customer-runtime>pending</dd>
+          </div>
+          <div>
+            <dt>Provider</dt>
+            <dd data-provider-runtime>pending</dd>
+          </div>
+          <div>
+            <dt>Oracle</dt>
+            <dd data-oracle>pending</dd>
+          </div>
+          <div>
+            <dt>Amount</dt>
+            <dd data-amount>pending</dd>
+          </div>
+          <div>
+            <dt>Provider key</dt>
+            <dd data-provider>pending</dd>
+          </div>
+          <div>
+            <dt>HTLC redeems</dt>
+            <dd data-redemption>pending</dd>
+          </div>
+        </dl>
+      </section>
+      <section class="result" aria-label="transaction result">
+        <pre data-result>waiting for browser Customer</pre>
+      </section>
+    </main>
+    <script type="module" src="./dist/app.js"></script>
+  </body>
+</html>

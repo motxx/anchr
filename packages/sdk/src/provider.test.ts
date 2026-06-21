@@ -9,10 +9,10 @@ import {
 } from "./provider.ts";
 import {
   buildHashResponseEvent,
-  buildPreimageDeliveryEvent,
   buildQueryRequestEvent,
   buildSelectionFeedbackEvent,
 } from "@anchr/protocol/events";
+import { buildPreimageDM } from "./adapters/nostr/events/dm.ts";
 import {
   decryptNip44,
   type Event,
@@ -997,14 +997,11 @@ test("Provider.serve receives oracle preimage DM and redeems the HTLC", async ()
   if (onPreimageEvent === null) {
     throw new Error("preimage subscribe was not called");
   }
-  (onPreimageEvent as (e: Event) => void)(buildPreimageDeliveryEvent(
-    oracleKey,
+  (onPreimageEvent as (e: Event) => void)(buildPreimageDM(
+    { ...oracleKey, secretKeyHex: bytesToHex(oracleKey.secretKey) },
     providerKey.publicKey,
-    {
-      query_id: "q-redeem",
-      request_event_id: requestEvent.id,
-      preimage: "ff".repeat(32),
-    },
+    "q-redeem",
+    "ff".repeat(32),
   ));
 
   await new Promise((r) => setTimeout(r, 30));

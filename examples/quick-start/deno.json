@@ -1,8 +1,0 @@
-{
-  "name": "@anchr-examples/quick-start",
-  "version": "0.0.0",
-  "exports": "./mod.ts",
-  "tasks": {
-    "smoke": "deno test --allow-env --allow-read --allow-write --allow-net --allow-run --allow-sys mod.test.ts"
-  }
-}

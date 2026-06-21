@@ -19,7 +19,7 @@
  *          contract may be re-published.
  *   [E030] package code must not import from examples/, e2e/, or scripts/;
  *          packages are the dependency roots, never consumers of repo tooling.
- *   [E031] browser-portable SDK/protocol roots must not reference Deno,
+ *   [E031] portable SDK/protocol roots must not reference Deno,
  *          node:* modules, or server-only SDK adapters.
  *
  * Per-line opt-out:
