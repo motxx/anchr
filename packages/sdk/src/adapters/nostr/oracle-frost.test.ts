@@ -101,7 +101,6 @@ describe("verifyAndDeliverWithFrost", () => {
 
     const passed = await service.verifyAndDeliverWithFrost(
       "q1",
-      "request-event-q1",
       makeQuery("q1"),
       makeResult(),
       providerPubkey,
@@ -164,7 +163,6 @@ describe("verifyAndDeliverWithFrost", () => {
 
     const passed = await service.verifyAndDeliverWithFrost(
       "q-rej",
-      "request-event-rej",
       makeQuery("q-rej"),
       makeResult(),
       providerPubkey,
@@ -188,7 +186,6 @@ describe("verifyAndDeliverWithFrost", () => {
     // Verification passes but coordinateSigning will fail (no real key material, no peers running)
     const passed = await service.verifyAndDeliverWithFrost(
       "q-nopeer",
-      "request-event-nopeer",
       makeQuery("q-nopeer"),
       makeResult(),
       providerPubkey,

@@ -120,7 +120,6 @@ export interface OracleNostrService {
   /** Verify and deliver using FROST signing (P2PK+FROST flow). */
   verifyAndDeliverWithFrost(
     requestId: string,
-    requestEventId: string,
     request: VerifiableRequest,
     result: RequestSubmissionResult,
     providerPubkey: string,
@@ -475,13 +474,7 @@ export function createOracleNostrService(
       return outcome.passed;
     },
 
-    async verifyAndDeliverWithFrost(
-      queryId,
-      _requestEventId,
-      query,
-      result,
-      providerPubkey,
-    ) {
+    async verifyAndDeliverWithFrost(queryId, query, result, providerPubkey) {
       const outcome = config.frostNodeConfig === undefined
         ? await rejectQuorumWithoutFrost(queryId, providerPubkey)
         : await verifyAndDeliverWithFrostInternal(

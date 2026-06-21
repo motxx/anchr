@@ -269,9 +269,6 @@ function watchRelayRequestsForOracle(
       if (findTagValue(event, "status") !== "processing") return;
       const requestEventId = findTagValue(event, "e");
       const selectedProvider = findTagValue(event, "p");
-      if (requestEventId === undefined || selectedProvider === undefined) {
-        return;
-      }
       if (requestEventId === null || selectedProvider === null) {
         return;
       }
