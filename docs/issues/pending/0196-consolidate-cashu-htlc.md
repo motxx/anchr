@@ -31,6 +31,14 @@ places.
 - `packages/sdk/src/payments/cashu/cashu-escrow.ts` (455 lines: two-phase HTLC
   + 2-of-2 P2PK lock).
 - They share only `buildHtlcFinalOptions` and `redeemSignedProofs`.
+- Additional evidence (2026-07-02 architecture review): the duplicated
+  security ruleset in `verifyProviderPaymentLock` (`adapters/cashu.ts`) —
+  locktime remaining ~:279, duplicate proofs ~:289, HTLC hash mismatch ~:335,
+  refund-key match ~:349, locktime match ~:355, SIG_ALL required ~:361 —
+  each must be kept in sync with `cashu-escrow.ts` by hand today.
+- Placement note for the resolver: `frost-escrow-provider.ts` lives under
+  `payments/cashu/` while the FROST math lives in `payments/frost/`; place it
+  deliberately during consolidation.
 
 ## Acceptance
 

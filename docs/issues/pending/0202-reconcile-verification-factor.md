@@ -13,7 +13,7 @@ Depends on:
 - None
 
 Blocks:
-- None
+- 0225
 
 ## Summary
 
@@ -32,6 +32,18 @@ doc.
   `requests/domain/types.ts` (~lines 38, 167), `index.ts` (~lines 109, 111).
 - `docs/architecture.md` (~lines 224-240) describes the removed target and
   cites closed issues; `CONTEXT.md` (~line 44).
+- Residue inventory (2026-07-02 architecture review): `VERIFICATION_FACTORS`
+  is an empty array and `VerificationFactor` a degenerate `string` alias
+  (`values.ts:14-15`); `requirement.factors` is written once
+  (`requests/application/query-verifier.ts:31`) and read by no check;
+  `challenge_nonce` is plumbed (`query-verifier.ts:33`,
+  `requests/domain/types.ts:164`, `query-aggregate.ts:83`) with no consuming
+  check; the check interface is still named `FactorCheck`
+  (`proofs/verification/checks/types.ts:39`).
+- The URI-dispatch half of the migration is already complete:
+  `proofs/verification/verifier.ts:34-54` dispatches via
+  `getSchemaBundle(schema)` and never reads `factors` — which strengthens the
+  "remove" option.
 
 ## Acceptance
 

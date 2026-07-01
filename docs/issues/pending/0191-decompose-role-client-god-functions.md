@@ -31,6 +31,16 @@ the payment path. The correct shape depends on the 0190 ownership decision.
   480-501 and the surrounding lifecycle).
 - This inline code is the concrete duplicate of the `requests/` lifecycle
   flagged in 0190.
+- Additional evidence (2026-07-02 architecture review): the twins duplicate
+  scaffolding beyond the god-functions — per-role state blocks
+  (`customer.ts:601-625` vs `provider.ts:475-504`: own status union, record
+  interface, key fn, write fn), and `validateCustomerOptions` (~90 lines,
+  `customer.ts:180-269`) vs `validateProviderOptions` (~107 lines,
+  `provider.ts:83-189`) are near-identical unknown-narrowing including a
+  byte-similar stateStore probe (`customer.ts:248-268` /
+  `provider.ts:115-135`). Provider's god-pipeline is `handleJob`
+  (~lines 298-464) with `waitForSelection`/`waitForPreimage` wrapping the
+  shared `waitForFirstEvent`.
 
 ## Acceptance
 

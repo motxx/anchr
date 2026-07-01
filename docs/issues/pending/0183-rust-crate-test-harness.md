@@ -28,6 +28,11 @@ have zero automated coverage, which is exactly where silent regressions hide.
 - `grep` for `#[test]` / `#[tokio::test]` / `mod tests` across `crates/`
   returns nothing; no `tests/` directories exist.
 - This harness is the prerequisite for verifying 0171, 0173, 0174, 0176.
+- Additional evidence (2026-07-02 architecture review): all four crates are
+  single-file `main.rs` binaries with no `lib` target
+  (`tlsn-prover` 964 lines, `tlsn-server` 594, `frost-signer` 360,
+  `tlsn-verifier` 165), so the pure functions are unreachable by unit tests
+  until the extraction step in the plan happens.
 
 ## Acceptance
 

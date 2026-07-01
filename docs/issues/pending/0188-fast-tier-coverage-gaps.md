@@ -37,6 +37,11 @@ error branches.
   `server-entry.ts` — route error inputs and config bootstrap untested.
 - `packages/sdk/src/proofs/verification/checks/photo-integrity.ts`
   `parseC2paImageSchemaOptions` — option-parsing branches untested (INV-06).
+- Test-shape context (2026-07-02 architecture review): the repo has 71 unit
+  test files, 1 integration test file, and 19 e2e files (~7.6k lines);
+  `customer.test.ts` (1,688 lines) and `provider.test.ts` (1,069) compensate
+  for missing facade seams (see 0191). The near-empty middle tier is why these
+  gaps default to Docker-only coverage.
 
 ## Acceptance
 

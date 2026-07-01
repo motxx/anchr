@@ -34,6 +34,10 @@ before doing a large rename.
   Request/Result/Feedback").
 - `query_id` as a raw wire field is grandfathered by architecture.md ~line 279;
   internal type/const/module names and spec table labels are not wire fields.
+- Additional evidence (2026-07-02 architecture review): a third vocabulary
+  exists in facade user-facing copy — `customer.ts` error messaging says
+  "Job Request" (e.g. `RelayPublishError` ~:107) — while "Paid Request" has
+  zero occurrences across `.ts` sources.
 
 ## Acceptance
 

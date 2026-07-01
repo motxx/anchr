@@ -33,6 +33,13 @@ change can alter verification behavior.
   (~line 23).
 - `docs/architecture.md` ("Schema-Owned Verification") assigns each schema its
   own checks; transport and verification have different owners.
+- Additional evidence (2026-07-02 architecture review): the leak is
+  bidirectional. Verification → attachments is the single edge
+  `photo-integrity.ts:23` (`fetchAttachmentData`, awaited at ~:343 — Blossom
+  download + decrypt runs inside the check). Attachments → proofs is three
+  edges: `upload.ts:5-14` plus `upload-helpers.ts:6`, with integrity-store
+  writes at `upload.ts:80-87` and ProofMode zip parsing at `:109`. No
+  injected attachment-fetch port exists yet.
 
 ## Acceptance
 
