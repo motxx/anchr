@@ -2,6 +2,7 @@
 
 Created: 2026-07-02
 Model: Claude Fable 5
+Completed: 2026-07-02
 
 ## Priority
 
@@ -42,3 +43,32 @@ it, so the two disagree.
 ## Plan
 
 - Correct or remove the `createHttpOracleClient` line in `README.md`.
+
+## Resolution
+
+Implemented by updating:
+
+- `README.md` — the Customer API sketch comment now names the real default
+  (`createNostrOracleClient`) and the real override point (`client:` with a
+  custom `OracleClient`) instead of the removed `createHttpOracleClient`.
+
+Verified with:
+
+- `rg "createHttpOracleClient" --glob '!docs/issues/**' .` returns no matches
+  (the symbol survives only inside closed-issue archives, which record
+  history and are not live docs).
+- `deno task lint:strict`
+
+Harness update:
+
+- Filed issue 0232 (typecheck README `ts` code fences against the real
+  `@anchr/*` surface), which absorbs the class of README-vs-exported-API
+  drift that let this stale reference survive the 0095 removal.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
