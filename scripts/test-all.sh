@@ -92,7 +92,16 @@ run_local() {
 # CI compile step before `flyctl deploy` builds it. The toolchain is pinned
 # by rust-toolchain.toml at the repo root.
 run_rust_gate() {
-  step "Phase 1: Rust Crate Gate (clippy + test)"
+  step "Phase 1: Rust Crate Gate (clippy + test + unused deps)"
+  if command -v cargo-machete > /dev/null 2>&1; then
+    run_test "unused deps (cargo machete)" \
+      cargo machete \
+      crates/frost-signer crates/tlsn-prover \
+      crates/tlsn-server crates/tlsn-verifier
+  else
+    echo "  ERROR: cargo-machete is not installed. Run: cargo install cargo-machete" >&2
+    fail "unused deps (cargo machete)"
+  fi
   local crate
   for crate in \
     crates/frost-signer \

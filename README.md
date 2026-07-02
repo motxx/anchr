@@ -132,8 +132,9 @@ const oraclePubkey = "npub1exampleoraclepubkey";
 const cashuProofsFromYourWallet: CashuProof[] = [];
 
 const customer = createCustomer({
-  // The Oracle hash bootstrap rides the relay as NIP-44 DMs by default;
-  // pass `client: createHttpOracleClient(...)` to use an HTTP oracle.
+  // The Oracle hash bootstrap rides the relay as NIP-44 DMs by default
+  // (`createNostrOracleClient`); pass `client:` with your own `OracleClient`
+  // to override the transport.
   oracles: [{ pubkey: oraclePubkey }],
   relays: relayUrls,
   mint: mintUrl,
