@@ -55,10 +55,10 @@ jobs:
         with:
           components: clippy
 
-      - name: Install cargo-audit (for lint:deps)
+      - name: Install cargo-audit (for lint:deps) and cargo-machete (Rust gate unused-dep check)
         uses: taiki-e/install-action@fd2f5e3d644b484055ebf4268f474c565f148f25 # v2.81.9
         with:
-          tool: cargo-audit
+          tool: cargo-audit,cargo-machete
 
       - name: Typecheck
         run: deno task check

@@ -11,7 +11,6 @@ dependencies = [
  "frost-secp256k1-tr",
  "hex",
  "rand",
- "serde",
  "serde_json",
 ]
 
