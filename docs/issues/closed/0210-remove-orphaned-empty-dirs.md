@@ -2,6 +2,7 @@
 
 Created: 2026-07-02
 Model: Claude Fable 5
+Completed: 2026-07-02
 
 ## Priority
 
@@ -43,3 +44,36 @@ replaced/dead paths outright.
 ## Plan
 
 - Delete the empty dirs (default), or populate + register if intended.
+
+## Resolution
+
+Implemented by removing the local orphaned directories:
+
+- `e2e/web/`, `e2e/pentest/`, `examples/browser-customer-server-provider/` —
+  all three were empty and untracked (`git ls-files` returned nothing for
+  them), so they existed only as working-tree residue; no tracked path
+  changed.
+
+Verified with:
+
+- `ls e2e/ examples/` — only the five documented e2e buckets
+  (protocol/relay/regtest/frost/tlsn, plus `helpers/`) and the two advertised
+  examples remain.
+- `git ls-files e2e/web e2e/pentest examples/browser-customer-server-provider`
+  returned nothing before removal, confirming the repository itself never
+  carried the dirs.
+
+Harness update:
+
+- None — git does not track empty directories, so this class of residue
+  cannot recur in the repository itself; "bucket = deno task" discovery
+  (`deno.json` + `e2e/<bucket>/`) already defines the sanctioned structure a
+  resolver checks against.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- None
