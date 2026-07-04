@@ -2,14 +2,8 @@
  * Internal helpers for attachment resolution and storage reading.
  */
 
-import { Buffer } from "node:buffer";
-import type {
-  AttachmentRef,
-  AttachmentStorageKind,
-  BlossomKeyMaterial,
-} from "../values.ts";
+import type { AttachmentRef } from "../values.ts";
 import type { StoredAttachment } from "./types.ts";
-import { downloadFromBlossom } from "./blossom.ts";
 
 type AttachmentLike = AttachmentRef | string;
 
@@ -76,52 +70,5 @@ export function normalizeFromString(ref: string): AttachmentRef {
     uri: ref,
     mime_type: "application/octet-stream",
     storage_kind: "external",
-  };
-}
-
-export async function readBlossomAttachment(
-  ref: AttachmentRef,
-  blossomKeyMaterial: BlossomKeyMaterial,
-): Promise<
-  {
-    filename: string;
-    mimeType: string;
-    absoluteUrl: string;
-    storageKind: AttachmentStorageKind;
-    data: Buffer;
-  } | null
-> {
-  const data = await downloadFromBlossom(
-    ref.blossom_hash!,
-    blossomKeyMaterial.encrypt_key,
-    blossomKeyMaterial.encrypt_iv,
-    ref.blossom_servers,
-  );
-  if (!data) return null;
-  return {
-    filename: ref.filename ?? ref.blossom_hash!,
-    mimeType: ref.mime_type ?? "application/octet-stream",
-    absoluteUrl: ref.uri,
-    storageKind: "blossom",
-    data: Buffer.from(data),
-  };
-}
-
-export async function readExternalAttachment(
-  attachment: StoredAttachment,
-): Promise<
-  {
-    filename: string;
-    mimeType: string;
-    absoluteUrl: string;
-    storageKind: AttachmentStorageKind;
-    data: Buffer;
-  } | null
-> {
-  const response = await fetch(attachment.absoluteUrl);
-  if (!response.ok) return null;
-  return {
-    ...attachment,
-    data: Buffer.from(await response.arrayBuffer()),
   };
 }

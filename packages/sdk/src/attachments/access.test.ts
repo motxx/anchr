@@ -2,7 +2,6 @@ import { test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
 import {
   buildAttachmentAbsoluteUrl,
-  materializeResultAttachments,
   normalizeResultAttachments,
   resolveStoredAttachment,
 } from "./access.ts";
@@ -45,19 +44,4 @@ test("normalizeResultAttachments preserves blossom attachment refs", () => {
 
   expect(result.attachments[0]?.storage_kind).toBe("blossom");
   expect(result.attachments[0]?.blossom_hash).toBe("abc123");
-});
-
-test("materializeResultAttachments expands blossom attachment refs", () => {
-  const result = materializeResultAttachments({
-    attachments: [{
-      id: "abc123",
-      uri: "https://blossom.example.com/abc123",
-      mime_type: "image/png",
-      storage_kind: "blossom",
-      blossom_hash: "abc123",
-    }],
-    notes: "ok",
-  }, "http://localhost:3000/requests/query_1");
-
-  expect(result.attachments[0]?.uri).toBe("https://blossom.example.com/abc123");
 });

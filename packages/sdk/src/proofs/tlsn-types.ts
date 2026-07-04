@@ -13,20 +13,8 @@ export interface TlsnRequirement {
   conditions?: TlsnCondition[];
   /** Max age of attestation in seconds (default: 300). */
   max_attestation_age_seconds?: number;
-  /** Domain hint for public display when actual URL is delivered via encrypted_context. */
+  /** Domain hint for public display. */
   domain_hint?: string;
-}
-
-/** Sensitive context encrypted to Provider — never stored publicly. */
-export interface TlsnEncryptedContext {
-  /** The actual target URL (may contain session IDs). */
-  target_url: string;
-  /** Custom HTTP headers (e.g., Authorization). */
-  headers?: Record<string, string>;
-  /** HTTP method override (default: GET). */
-  method?: "GET" | "POST";
-  /** Request body for POST requests. */
-  body?: string;
 }
 
 /** Provider-submitted TLSNotary presentation, base64-encoded. */
@@ -56,15 +44,8 @@ export interface TlsnExtensionResult {
   results?: readonly TlsnExtensionResultEntry[];
 }
 
-export type TlsnEvidence = TlsnAttestation | TlsnExtensionResult;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
-}
-
-function isStringRecord(value: unknown): value is Record<string, string> {
-  return isRecord(value) &&
-    Object.values(value).every((entry) => typeof entry === "string");
 }
 
 function isHttpMethod(value: unknown): value is "GET" | "POST" {
@@ -113,19 +94,6 @@ export function isTlsnRequirement(value: unknown): value is TlsnRequirement {
   ) {
     return false;
   }
-  return true;
-}
-
-export function isTlsnEncryptedContext(
-  value: unknown,
-): value is TlsnEncryptedContext {
-  if (!isRecord(value)) return false;
-  if (typeof value.target_url !== "string") return false;
-  if (value.headers !== undefined && !isStringRecord(value.headers)) {
-    return false;
-  }
-  if (value.method !== undefined && !isHttpMethod(value.method)) return false;
-  if (value.body !== undefined && typeof value.body !== "string") return false;
   return true;
 }
 
