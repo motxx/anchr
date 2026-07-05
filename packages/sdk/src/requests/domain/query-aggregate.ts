@@ -92,7 +92,6 @@ export function createQueryAggregate(
     nostr_event_id: options.nostrEventId,
     schema_requirement: input.schema_requirement,
     quorum: options.quorum,
-    visibility: input.visibility,
   };
 
   return { ok: true, query };

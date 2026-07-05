@@ -48,7 +48,12 @@ export function isTerminal(status: QueryStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
 }
 
-/** Open queries accept lifecycle progress and cancellation. */
+/**
+ * Pre-verification, non-terminal statuses: the query can still be
+ * cancelled. `verifying` has forward transitions but is not open —
+ * once a result is under verification, cancellation is no longer
+ * allowed.
+ */
 export function isOpenStatus(status: QueryStatus): boolean {
   return OPEN_STATUSES.includes(status);
 }

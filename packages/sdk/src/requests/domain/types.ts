@@ -27,17 +27,12 @@ export type CustomerType = "agent" | "human" | "app";
 export type ExecutorType = "human" | "agent" | "service";
 export type SubmissionChannel = "adapter";
 
-/** Controls whether proof details are published to Nostr relays or kept private. */
-export type ProofVisibility = "public" | "customer_only";
-
 export interface QueryInput {
   description: string;
   schema?: SchemaUri;
   location_hint?: string;
   verification_requirements?: readonly VerificationFactor[];
   schema_requirement?: unknown;
-  /** Proof visibility controls whether schema verdict details are published. */
-  visibility?: ProofVisibility;
 }
 
 export interface QueryResult {
@@ -189,6 +184,4 @@ export interface Query {
   quorum?: QuorumConfig;
   /** Individual oracle attestations collected during quorum verification. */
   attestations?: OracleAttestationRecord[];
-  /** Proof visibility controls whether schema verdict details are published. */
-  visibility?: ProofVisibility;
 }

@@ -174,12 +174,10 @@ describe("createQueryAggregate", () => {
     const q = expectOk(createQueryAggregate({
       ...defaultInput,
       schema_requirement: { target_url: "https://example.com/api" },
-      visibility: "public",
     }, defaultOptions));
     expect(q.schema_requirement).toEqual({
       target_url: "https://example.com/api",
     });
-    expect(q.visibility).toBe("public");
   });
 
   test("generates nonce when nonce is in verification_requirements", () => {
