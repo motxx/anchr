@@ -28,38 +28,6 @@ export type {
   Subscription,
 } from "../types.ts";
 
-/**
- * Publish a signed event to a list of relays. Returns per-relay outcomes.
- *
- * The pool is created and closed within this call; for repeated publishes
- * use `createRelayClient` instead.
- */
-export async function publishOnce(
-  event: Event,
-  relays: readonly string[],
-): Promise<PublishResult> {
-  const pool = new SimplePool();
-  try {
-    const promises = pool.publish([...relays], event);
-    const results = await Promise.allSettled(promises);
-    const successes: string[] = [];
-    const failures: { relay: string; reason: string }[] = [];
-    results.forEach((r, i) => {
-      if (r.status === "fulfilled") {
-        successes.push(relays[i]);
-      } else {
-        failures.push({
-          relay: relays[i],
-          reason: String(r.reason ?? "unknown"),
-        });
-      }
-    });
-    return { successes, failures };
-  } finally {
-    pool.close([...relays]);
-  }
-}
-
 /** Construct a long-lived relay client over the given relay URLs. */
 export function createRelayClient(relays: readonly string[]): RelayClient {
   const pool = new SimplePool();

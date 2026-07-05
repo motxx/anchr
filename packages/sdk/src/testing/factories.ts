@@ -2,11 +2,6 @@ import type { Query } from "../requests/domain/types.ts";
 
 let queryCounter = 0;
 
-/** Reset the query counter (useful in beforeEach). */
-export function resetQueryCounter(): void {
-  queryCounter = 0;
-}
-
 /**
  * Create a test Query with sensible defaults.
  * All fields can be overridden via the `overrides` parameter.

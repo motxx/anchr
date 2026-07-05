@@ -99,12 +99,6 @@ function findTlsnVerifier(
   return onPath;
 }
 
-export function isTlsnVerifierAvailable(
-  executor: SidecarExecutor = serverSidecarExecutor,
-): boolean {
-  return findTlsnVerifier(executor) !== null;
-}
-
 /**
  * Resolve the verifier binary path: an explicit override (a path string, or
  * `null` to force "unavailable") takes precedence; `undefined` falls back to

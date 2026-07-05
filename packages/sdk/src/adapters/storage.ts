@@ -47,31 +47,6 @@ export function isPersistenceNotFoundError(
   return error instanceof PersistenceNotFoundError;
 }
 
-export interface MemoryPersistenceStoreOptions {
-  initialEntries?: readonly (readonly [string, string])[];
-}
-
-export function createMemoryPersistenceStore(
-  options: MemoryPersistenceStoreOptions = {},
-): PersistenceStore {
-  const values = new Map<string, string>(options.initialEntries);
-  return {
-    async readText(key: string): Promise<string> {
-      const value = values.get(key);
-      if (value === undefined) {
-        throw new PersistenceNotFoundError(key);
-      }
-      return value;
-    },
-    async writeText(key: string, value: string): Promise<void> {
-      values.set(key, value);
-    },
-    async replaceTextAtomically(key: string, value: string): Promise<void> {
-      values.set(key, value);
-    },
-  };
-}
-
 export function createFileSystemPersistenceStore(): PersistenceStore {
   return {
     async readText(key: string): Promise<string> {
