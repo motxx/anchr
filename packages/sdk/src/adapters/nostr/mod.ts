@@ -8,7 +8,7 @@
  * (`buildOracleApp` — FROST signer/DKG routes). Neither re-exports the other.
  */
 
-export { createRelayClient, publishOnce } from "./client.ts";
+export { createRelayClient } from "./client.ts";
 export type {
   Filter,
   PublishResult,

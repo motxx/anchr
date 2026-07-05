@@ -1,4 +1,4 @@
-import type { AttachmentRef, BlossomKeyMaterial } from "../values.ts";
+import type { AttachmentRef } from "../values.ts";
 import type { QueryResult as RequestSubmissionResult } from "../requests/domain/types.ts";
 import {
   type AttachmentRuntimeConfig,
@@ -8,20 +8,13 @@ import { inferMimeTypeFromFilename } from "./mime.ts";
 import {
   attachmentRefSource,
   extractBlossomFields,
-  inferAttachmentId,
   normalizeFromRef,
   normalizeFromResolved,
   normalizeFromString,
-  readBlossomAttachment,
-  readExternalAttachment,
 } from "./attachment-helpers.ts";
-import type {
-  StoredAttachment,
-  StoredAttachmentBuffer,
-  StoredAttachmentStats,
-} from "./types.ts";
+import type { StoredAttachment } from "./types.ts";
 
-export type { StoredAttachment, StoredAttachmentBuffer, StoredAttachmentStats };
+export type { StoredAttachment };
 
 type AttachmentLike = AttachmentRef | string;
 
@@ -90,20 +83,6 @@ export function materializeAttachmentRef(
   };
 }
 
-export function materializeResultAttachments(
-  result: RequestSubmissionResult,
-  requestUrl?: string,
-  options?: AttachmentAccessOptions,
-): RequestSubmissionResult {
-  if (!result.attachments?.length) return result;
-  return {
-    ...result,
-    attachments: result.attachments.map((attachment) =>
-      materializeAttachmentRef(attachment, requestUrl, options)
-    ),
-  };
-}
-
 export function normalizeResultAttachments(
   result: RequestSubmissionResult,
   requestUrl?: string,
@@ -136,61 +115,5 @@ export function resolveStoredAttachment(
     };
   } catch {
     return null;
-  }
-}
-
-export async function readStoredAttachmentAsBase64(
-  ref: AttachmentLike,
-  requestUrl?: string,
-): Promise<(Omit<StoredAttachmentBuffer, "data"> & { data: string }) | null> {
-  const attachment = await readStoredAttachmentBuffer(ref, requestUrl);
-  if (!attachment) return null;
-
-  return {
-    ...attachment,
-    data: attachment.data.toString("base64"),
-  };
-}
-
-export async function readStoredAttachmentBuffer(
-  ref: AttachmentLike,
-  requestUrl?: string,
-  blossomKeyMaterial?: BlossomKeyMaterial,
-): Promise<StoredAttachmentBuffer | null> {
-  // Handle Blossom-hosted attachments (encrypted, content-addressed)
-  if (
-    typeof ref !== "string" && ref.storage_kind === "blossom" &&
-    ref.blossom_hash && blossomKeyMaterial
-  ) {
-    return readBlossomAttachment(ref, blossomKeyMaterial);
-  }
-
-  const attachment = resolveStoredAttachment(ref, requestUrl);
-  if (!attachment) return null;
-
-  return readExternalAttachment(attachment);
-}
-
-export async function statStoredAttachment(
-  ref: AttachmentLike,
-  requestUrl?: string,
-): Promise<StoredAttachmentStats | null> {
-  const attachment = resolveStoredAttachment(ref, requestUrl);
-  if (!attachment) return null;
-
-  try {
-    const response = await fetch(attachment.absoluteUrl, { method: "HEAD" });
-    if (!response.ok) return null;
-    const sizeHeader = response.headers.get("content-length");
-    return {
-      ...attachment,
-      size: sizeHeader ? Number(sizeHeader) : 0,
-      mimeType: response.headers.get("content-type") ?? attachment.mimeType,
-    };
-  } catch {
-    return {
-      ...attachment,
-      size: 0,
-    };
   }
 }

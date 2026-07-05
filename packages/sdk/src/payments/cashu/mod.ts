@@ -1,7 +1,7 @@
 /**
  * Cashu Payment Lock escrow: create, bind, verify, redeem, and refund ecash
  * locked to a query via HTLC (NUT-14) or 2-of-2 P2PK (NUT-11), plus the
- * wallet, wallet-store, and HTLC preimage release material that back it.
+ * wallet and HTLC preimage release material that back it.
  */
 
 export {
@@ -67,9 +67,6 @@ export {
   verifyToken,
 } from "./cashu-wallet.ts";
 export type { CashuConfig, CreateBountyTokenOptions } from "./cashu-wallet.ts";
-
-export { createWalletStore } from "./wallet-store.ts";
-export type { WalletBalance, WalletRole, WalletStore } from "./wallet-store.ts";
 
 export {
   createPersistentPreimageStore,

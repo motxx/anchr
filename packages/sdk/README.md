@@ -187,7 +187,7 @@ const customer = createCustomer({
 });
 
 // After driving a flow, assert on the recorded calls:
-// cashuClient.locks / cashuClient.binds / cashuClient.redeems
+// cashuClient.binds / cashuClient.redeems
 ```
 
 Real e2e coverage against a regtest Cashu mint and Nostr relay lives at

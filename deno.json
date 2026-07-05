@@ -12,7 +12,6 @@
     "strict": true
   },
   "imports": {
-    "hono": "jsr:@hono/hono@^4",
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
     "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
     "@std/testing/bdd": "jsr:@std/testing@^1/bdd",
@@ -22,8 +21,6 @@
     "nostr-tools/pool": "npm:nostr-tools@^2/pool",
     "nostr-tools/filter": "npm:nostr-tools@^2/filter",
     "nostr-tools/core": "npm:nostr-tools@^2/core",
-    "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
-    "nostr-tools/nip44": "npm:nostr-tools@^2/nip44",
     "nostr-tools/pure": "npm:nostr-tools@^2/pure",
     "@noble/curves/secp256k1": "npm:@noble/curves@^2/secp256k1.js",
     "@anchr/protocol": "./packages/protocol/src/mod.ts",
@@ -46,9 +43,7 @@
     "@anchr/sdk/customer": "./packages/sdk/src/customer.ts",
     "@anchr/sdk/provider": "./packages/sdk/src/provider.ts",
     "@anchr/sdk/oracle": "./packages/sdk/src/oracle.ts",
-    "@anchr/sdk/testing": "./packages/sdk/src/testing/mod.ts",
-    "@logtape/logtape": "jsr:@logtape/logtape@^2",
-    "puppeteer": "npm:puppeteer@^24"
+    "@anchr/sdk/testing": "./packages/sdk/src/testing/mod.ts"
   },
   "unstable": ["sloppy-imports", "detect-cjs"],
   "tasks": {
@@ -112,6 +107,7 @@
     },
     "exclude": [
       "dist/",
+      "docs/sdk/support.js",
       "packages/sdk/dist/",
       "scripts/"
     ]

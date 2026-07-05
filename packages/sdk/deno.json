@@ -26,7 +26,6 @@
     "@noble/hashes/sha2.js": "jsr:@noble/hashes@^2/sha2.js",
     "@noble/hashes/utils.js": "jsr:@noble/hashes@^2/utils.js",
     "@cashu/cashu-ts": "npm:@cashu/cashu-ts@^3",
-    "@anchr/protocol": "../protocol/src/mod.ts",
     "@anchr/protocol/events": "../protocol/src/events.ts",
     "@anchr/protocol/nostr": "../protocol/src/nostr.ts",
     "@anchr/protocol/schema": "../protocol/src/schema.ts",
@@ -36,9 +35,7 @@
     "nostr-tools/pool": "npm:nostr-tools@^2/pool",
     "nostr-tools/filter": "npm:nostr-tools@^2/filter",
     "nostr-tools/core": "npm:nostr-tools@^2/core",
-    "nostr-tools/pure": "npm:nostr-tools@^2/pure",
-    "nostr-tools/nip19": "npm:nostr-tools@^2/nip19",
-    "nostr-tools/nip44": "npm:nostr-tools@^2/nip44"
+    "nostr-tools/pure": "npm:nostr-tools@^2/pure"
   },
   "publish": {
     "include": [

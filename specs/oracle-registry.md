@@ -109,8 +109,9 @@ announcement for the same Oracle ID, keeping relay storage bounded.
 
 The announcement is self-reported. It tells you what an Oracle _claims_ to
 support, not what it _actually_ supports. The cryptographic verification in
-Specs 03-04 is what enforces correctness — the registry is a convenience for
-discovery, not a trust mechanism.
+[`paid-request-exchange.md`](./paid-request-exchange.md) and
+[`proof-schemas.md`](./proof-schemas.md) is what enforces correctness — the
+registry is a convenience for discovery, not a trust mechanism.
 
 Customers SHOULD:
 
