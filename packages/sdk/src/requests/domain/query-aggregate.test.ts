@@ -188,7 +188,6 @@ describe("createQueryAggregate", () => {
       verification_requirements: ["nonce", "c2pa"],
     }, defaultOptions));
     expect(q.challenge_nonce).toBeDefined();
-    expect(q.challenge_rule).toBeDefined();
   });
 
   test("does not generate nonce when nonce is not required", () => {

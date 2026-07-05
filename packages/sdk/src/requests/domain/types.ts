@@ -12,7 +12,6 @@ export type QueryStatus =
   | "provider_selected"
   | "processing"
   | "verifying"
-  | "submitted"
   | "approved"
   | "rejected"
   | "expired";
@@ -162,7 +161,6 @@ export interface Query {
   description: string;
   location_hint?: string;
   challenge_nonce?: string;
-  challenge_rule?: string;
   /** Verification factors requested by the Customer. */
   verification_requirements: readonly VerificationFactor[];
   created_at: number;
@@ -193,6 +191,4 @@ export interface Query {
   attestations?: OracleAttestationRecord[];
   /** Proof visibility controls whether schema verdict details are published. */
   visibility?: ProofVisibility;
-  /** Nostr event IDs of published attestation events. */
-  published_proofs?: string[];
 }

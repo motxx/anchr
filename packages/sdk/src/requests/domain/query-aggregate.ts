@@ -17,8 +17,8 @@ import type {
 import type { Clock, DomainServices } from "./ports.ts";
 import { realDomainServices } from "./ports.ts";
 import {
-  isCancellable,
   isExpirable,
+  isOpenStatus,
   isValidTransition,
 } from "./query-transitions.ts";
 import {
@@ -29,7 +29,6 @@ import {
 } from "./value-objects.ts";
 
 export { MIN_ESCROW_LOCKTIME_SECS };
-import { buildChallengeRule } from "./challenge.ts";
 
 const DEFAULT_QUERY_SCHEMA = "https://anchr-spec.org/spec/proof/photo/v1";
 
@@ -81,9 +80,6 @@ export function createQueryAggregate(
     description: input.description,
     location_hint: input.location_hint,
     challenge_nonce: nonce,
-    challenge_rule: nonce
-      ? buildChallengeRule(nonce, input.description)
-      : undefined,
     verification_requirements: requirements,
     created_at: now,
     expires_at: now + options.ttlMs,
@@ -167,9 +163,9 @@ export function expireQuery(query: Query, now: number): TransitionResult {
   };
 }
 
-/** Cancel a query if it is in a cancellable state. */
+/** Cancel a query if it is still open. */
 export function cancelQuery(query: Query): TransitionResult {
-  if (!isCancellable(query.status)) {
+  if (!isOpenStatus(query.status)) {
     return { ok: false, error: `Query is already ${query.status}` };
   }
   return {
