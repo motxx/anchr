@@ -51,7 +51,7 @@ jobs:
       # rust-toolchain.toml — rustup resolves every in-repo cargo invocation
       # through that file.
       - name: Setup Rust (channel pinned by rust-toolchain.toml)
-        uses: dtolnay/rust-toolchain@1.94.0
+        uses: dtolnay/rust-toolchain@1.100.0
         with:
           components: clippy
 
