@@ -279,14 +279,18 @@ Oracle attestations (Nostr kind 30103) are published to relays and are publicly
 verifiable. Relay publication is append-only in practice, so attestation events
 are irreversible once published. The published payload records `oracle_id`,
 `query_id`, `passed`, `checks`, `failures`, `attested_at`, and optional
-attestation `details`. There is no host-facing proof-detail publication surface;
-proof details stay customer-only. Risks to other use cases:
+attestation `details` — and `details` carries the schema verdict verbatim, so
+everything the verdict contains is public plaintext. For TLSN schemas the
+verdict can include revealed transcript data (`revealed_body`). Raw proof
+artifacts and encrypted attachments are delivered customer-only, but verdict
+contents are not private. Risks to other use cases:
 
-| Risk                    | Severity | Trigger                                               | Mitigation                               |
-| ----------------------- | -------- | ----------------------------------------------------- | ---------------------------------------- |
-| Metadata correlation    | Medium   | Same Oracle handles attestations across use cases     | Separate Oracle keys per use case        |
-| Tor anonymity breach    | Medium   | Same node does Tor traffic + Nostr publish            | Node isolation or Tor-routed Nostr relay |
-| Query content inference | Low      | Oracle specialization revealed by public attestations | Oracle separation                        |
+| Risk                     | Severity | Trigger                                                | Mitigation                                                       |
+| ------------------------ | -------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| Verdict content exposure | High     | Schema verdict carrying revealed TLSN transcript data  | Reveal only the minimum transcript ranges the verification needs |
+| Metadata correlation     | Medium   | Same Oracle handles attestations across use cases      | Separate Oracle keys per use case                                |
+| Tor anonymity breach     | Medium   | Same node does Tor traffic + Nostr publish             | Node isolation or Tor-routed Nostr relay                         |
+| Query content inference  | Low      | Oracle specialization revealed by public attestations  | Oracle separation                                                |
 
 ## Trust surface: Mint layer
 
