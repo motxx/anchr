@@ -273,22 +273,27 @@ that does not match the release material, is not bound to the Provider, cannot
 be signed by the Provider, or is rejected by the settlement backend is not
 spendable and must not redeem.
 
-## Trust surface: Proof publication
+## Trust surface: Attestation publication
 
-Proof publication (visibility `"public"`) is implemented and irreversible (Nostr
-events cannot be deleted). The `visibility` parameter lives on the internal
-request lifecycle (`QueryInput` consumed by the QueryService and the Oracle's
-attestation publication) — hosts that compose the lifecycle own this decision.
-The public `Customer.request` API does not publish proofs and exposes no
-`visibility` switch. Risks to other use cases:
+Oracle attestations (Nostr kind 30103) are publicly verifiable events: anyone
+can check the Oracle's signature and reproduce the deterministic verification
+checks. The SDK owns the event shape (`buildOracleAttestationEvent`); the
+Oracle host composes whether and where to publish. Relay publication is
+append-only in practice, so a published attestation is irreversible. The
+payload records `oracle_id`, `query_id`, `passed`, `checks`, `failures`,
+`attested_at`, and optional attestation `details` — and `details` carries the
+schema verdict verbatim, so everything the verdict contains becomes public
+plaintext on publication. For TLSN schemas the verdict can include revealed
+transcript data (`revealed_body`). Raw proof artifacts and encrypted
+attachments are delivered customer-only, but published verdict contents are
+not private. Risks to publishing hosts:
 
-| Risk                                          | Severity | Trigger                                         | Mitigation                                           |
-| --------------------------------------------- | -------- | ----------------------------------------------- | ---------------------------------------------------- |
-| Accidental publication (Nostr is append-only) | High     | Developer misconfiguration                      | `visibility` is a required parameter with no default |
-| Metadata correlation                          | Medium   | Same Oracle handles public + private proofs     | Separate Oracle keys per use case                    |
-| Tor anonymity breach                          | Medium   | Same node does Tor traffic + Nostr publish      | Node isolation or Tor-routed Nostr relay             |
-| Default-change pressure                       | Medium   | Future protocol updates                         | `visibility` must never have a default value         |
-| Query content inference                       | Low      | Oracle specialization revealed by public proofs | Oracle separation                                    |
+| Risk                     | Severity | Trigger                                                | Mitigation                                                       |
+| ------------------------ | -------- | ------------------------------------------------------ | ---------------------------------------------------------------- |
+| Verdict content exposure | High     | Schema verdict carrying revealed TLSN transcript data  | Reveal only the minimum transcript ranges the verification needs |
+| Metadata correlation     | Medium   | Same Oracle handles attestations across use cases      | Separate Oracle keys per use case                                |
+| Tor anonymity breach     | Medium   | Same node does Tor traffic + Nostr publish             | Node isolation or Tor-routed Nostr relay                         |
+| Query content inference  | Low      | Oracle specialization revealed by public attestations  | Oracle separation                                                |
 
 ## Trust surface: Mint layer
 

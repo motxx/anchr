@@ -155,7 +155,10 @@ semantics remain owned by the SDK role modules and request internals.
 core. It is not a public `@anchr/sdk/requests` subpath. Its responsibility is
 to model and orchestrate one local request from creation through offers,
 provider selection, proof submission, verification, release, completion, expiry,
-and purge.
+and purge. It is the single owner of the lifecycle state machine: role facades
+(`customer.ts`, `provider.ts`) reach the lifecycle through
+`requests/application` services and hold no independent status model
+(ADR 0003).
 
 The request internals own request-bound state and lifecycle ports:
 
