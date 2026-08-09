@@ -27,8 +27,8 @@ inline in `customer.ts`, `provider.ts`, and
 `adapters/nostr/oracle-service.ts`. ADR 0003 declares the aggregate "the only
 lifecycle status model" for all roles, which no production code satisfies.
 
-Resolve the split by promotion, not deletion: the machine becomes the
-Oracle's persistent state model, wired into the production Oracle daemon.
+Resolve the split by promoting the machine to the Oracle's persistent state
+model, wired into the production Oracle daemon.
 Customer and Provider keep request-lifetime volatile state; role-neutral
 transition vocabulary moves to `@anchr/protocol`. The `domain/` /
 `application/` layer directories dissolve — that layering exists nowhere else
@@ -64,7 +64,11 @@ files.
   an Oracle-owned module; the `requests/domain` and `requests/application`
   directories no longer exist.
 - ADR 0003 states Oracle ownership (protocol owns transition vocabulary,
-  roles own their projections); E026/E029 are retargeted or retired to match.
+  roles own their projections); E026/E029 are retired, with boundary
+  enforcement handed to 0250's reachability lint.
+- Release delivery is crash-safe: a durable delivery intent (outbox) with an
+  idempotency key tied to the request and its state version covers the gap
+  between committing a verified state and publishing the delivery DM.
 
 ## Verification
 
@@ -72,7 +76,8 @@ files.
   unchanged.
 - No matches expected: `rg "requests/(domain|application)" packages e2e examples`
 - Restart-safety is covered by a test: a request in a verified-but-undelivered
-  state survives an Oracle process restart.
+  state survives an Oracle process restart, and a crash injected between
+  state commit and delivery publication yields exactly one delivery on retry.
 
 ## Plan
 

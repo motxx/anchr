@@ -69,9 +69,10 @@ discussions into Cashu implementation terms. Two changes:
 ## Verification
 
 - `deno task lint:strict` passes (includes the docs-affecting lints).
-- No matches expected outside the Cashu adapter and its docs:
-  `rg -i "witness" docs CONTEXT.md specs --glob '!specs/messaging.md'`
-  (messaging.md may retain it only if describing the Cashu adapter mapping).
+- No matches expected in the target files:
+  `rg -i "witness" CONTEXT.md docs/architecture.md docs/threat-model.md specs --glob '!specs/messaging.md'`
+  (messaging.md may retain it only if describing the Cashu adapter mapping;
+  issue files under `docs/issues/` and Cashu adapter docs are out of scope).
 
 ## Plan
 

@@ -16,6 +16,7 @@ Blocks:
 - 0248
 - 0250
 - 0252
+- 0253
 
 ## Summary
 
@@ -61,8 +62,10 @@ internals. Move build/parse and the wire payload types into
 
 ## Verification
 
-- No matches expected:
-  `rg "export function build.*Event|export function parse" packages/sdk/src/adapters/nostr/events/`
+- `packages/sdk/src/adapters/nostr/events/` retains no exported symbol of
+  any kind (builders, parsers, payload types, constants, re-exports):
+  `rg "^export" packages/sdk/src/adapters/nostr/events/` returns nothing, or
+  the directory is deleted.
 - `deno task lint:strict`, `deno task test:unit`, and
   `deno task test:e2e:protocol` pass.
 - `deno task publish:dry-run` passes for both packages.

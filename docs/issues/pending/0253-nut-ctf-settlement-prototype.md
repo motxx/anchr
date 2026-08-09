@@ -11,6 +11,8 @@ investigation
 
 Depends on:
 - 0246
+- 0247
+- 0248
 
 Blocks:
 - None
@@ -57,8 +59,10 @@ production mint supports it.
   signatures, verify provider binding) against a cdk build with the CTF
   changes, exercised by an experimental e2e flow (Customer locks, Provider
   redeems after oracle attestation, refund path on timeout).
-- A written findings note records: mapping confirmations or deviations,
-  mint-visible metadata compared to HTLC, and spec feedback filed or drafted.
+- A written findings note records: the pinned NUT-CTF spec revision and cdk
+  commit plus build configuration, mapping confirmations or deviations
+  (hypotheses kept distinct from confirmed behavior), mint-visible metadata
+  compared to HTLC, and spec feedback filed or drafted.
 
 ## Verification
 

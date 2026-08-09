@@ -67,6 +67,11 @@ proof (two contradictory signatures under one group key).
   bound to, a quorum-signed statement covering the oracle group pubkey, the
   query id, the proof hash, and the verdict; signing sessions that omit the
   statement produce no spend signatures.
+- The statement has a canonical serialization and a domain-separated hash,
+  and that hash is committed into the FROST signing session itself (the
+  NUT-11 `SIG_INPUTS` spend messages stay unchanged), so partial signatures
+  cannot be produced in, or reattached to, a session with a different
+  statement.
 - `docs/threat-model.md` gains an INV-C2 entry (claim, attack, expected,
   tests) with a matching `threat-model.lock.json` hash, and the mint-layer
   table marks the HTLC-alone path as INV-C2 non-compliant.

@@ -45,9 +45,11 @@ schemas with conformance tests so the two cannot drift.
 
 - Every event type built/parsed by `@anchr/protocol` has a JSON Schema and
   at least one valid and one invalid test vector under `specs/`.
-- A conformance test suite feeds the vectors through the TypeScript parsers:
-  valid vectors parse, invalid vectors are rejected, and schema-validity
-  matches parser acceptance for every vector.
+- A conformance test suite feeds the vectors through both layers and records
+  them separately: valid vectors must satisfy their schema and parse; each
+  invalid vector declares its expected rejection layer (schema or parser) and
+  the suite asserts that layer — a structurally valid vector may still be
+  parser-rejected (signing, encryption, transition rules).
 - The spec-site lists the schemas so they are fetchable at stable URLs.
 
 ## Verification

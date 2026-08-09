@@ -14,6 +14,7 @@ Depends on:
 
 Blocks:
 - 0252
+- 0253
 
 ## Summary
 
@@ -49,7 +50,12 @@ the settlement adapter for that scheme.
   FROST-specific delivery variants are deleted (pre-1.0, no compat shims).
 - Customer- and Provider-facing types expose release material opaquely; no
   role-facing type names a scheme-specific field for it.
-- `specs/messaging.md` documents the generalized payload.
+- The contract specifies the `material` encoding (JSON type and
+  canonicalization), the registered `scheme` identifiers and how new ones are
+  added, and parser behavior for unknown schemes — enough for another-language
+  implementation to validate the payload and for 0252 to derive stable
+  schemas and test vectors.
+- `specs/messaging.md` documents the generalized payload and those rules.
 
 ## Verification
 

@@ -74,7 +74,10 @@ reachability lint, not only a package-dependency rule.
   `deno task lint:arch`.
 - A reachability rule fails CI when a `customer`/`provider` entry point can
   statically reach a proof verification implementation or Oracle-only
-  release-material production code.
+  release-material production code — including reachability through barrel
+  re-exports and shared plugin entrypoints; dynamic-import escape hatches
+  remain banned by `lint:no-dynamic-import`, and both negative cases are
+  covered by tests.
 - Each settlement/proof plugin package ships a conformance test for its
   obligations (including verify-purity: same inputs, same result, no
   ambient time/network/randomness).
