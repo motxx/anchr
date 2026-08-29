@@ -213,7 +213,7 @@ export async function verifyToken(
           error: `${spent.length} proof(s) already spent on mint`,
         };
       }
-      log.error(
+      log.info(
         `Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`,
       );
     } catch (err) {

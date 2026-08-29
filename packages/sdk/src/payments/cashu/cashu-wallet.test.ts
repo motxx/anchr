@@ -8,11 +8,11 @@ function makeToken(amount: number): string {
     mint: "https://mint.example.com",
     proofs: [{
       amount,
-      id: "test-keyset",
+      id: "00".repeat(8),
       secret: "test-secret",
       C: `02${"ab".repeat(32)}`,
     }],
-  });
+  }, { version: 4 });
 }
 
 describe("verifyToken", () => {
