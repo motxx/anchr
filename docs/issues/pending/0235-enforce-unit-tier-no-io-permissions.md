@@ -29,7 +29,7 @@ test fails loudly at the permission boundary.
 ## Rationale
 
 - `deno.json` `test:unit` task: full permission set on the no-I/O tier.
-- CLAUDE.md test rules: unit tier = "No I/O".
+- AGENTS.md test rules: unit tier = "No I/O".
 - 0216 covers gate-marker integrity and `deno task test` drift; it does not
   touch tier permissions. 0189 removes sleeps but not I/O capability.
 - Depends on 0234 so the in-process wiring test is out of the unit tier

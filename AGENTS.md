@@ -1,47 +1,68 @@
 # AGENTS.md
 
-Project notes for Codex and other coding agents.
+Project rules that coding agents cannot reliably infer from the repository.
+Use `docs/architecture.md` for ownership and dependency boundaries,
+`CONTEXT.md` for domain vocabulary, and `deno.json` for available commands.
 
-Read `CLAUDE.md` for the core project rules. This repository keeps the main
-runtime, logging, type, test, lint, and layout guidance there so Claude and
-Codex share one source of truth.
+## Editing rules
 
-Current package, app, and example boundaries are documented in `CLAUDE.md` and
-`docs/architecture.md`; keep agent-specific notes as pointers instead of
-duplicating the layout rules here.
+- Do not use `console.*` in `packages/`. Use the shared LogTape-backed logger.
+- Do not introduce `any` or double casts in `packages/`. Prefer type predicates;
+  keep `unknown` and justified casts at parser or I/O boundaries.
+- Before 1.0, delete replaced paths. Do not add compatibility aliases,
+  deprecated shims, or parallel implementations. Lock changed behavior with a
+  test.
+- Comments explain only a non-obvious current reason, invariant, workaround, or
+  ordering constraint. Do not narrate change history.
+- Live documentation describes current behavior. Put durable design trade-offs
+  in an ADR; otherwise remove historical explanation.
+- Give each function, module, package, adapter, public surface, app, and example
+  one owner responsibility. Challenge convenience layers that duplicate an
+  existing owner or bundle independently replaceable concerns.
+
+## Tests and completion
+
+- Unit tests are `*.test.ts` beside package source and perform no I/O.
+- In-process HTTP, WebSocket, or Blossom tests are
+  `*.integration.test.ts` beside package source.
+- Tests requiring external services belong in the matching `e2e/<bucket>/`.
+- A failed check is fixed, not skipped, weakened, or run with `--no-check`.
+- Run focused checks while editing and `deno task test:all` before completion.
+  Run `deno task test:all:docker` when changing Docker-backed E2E,
+  infrastructure, or release-critical payment and proof paths.
+- Keep each `INV-NN` threat-model invariant linked to a test and its lock-file
+  hash; changing the invariant requires a stated justification.
+- Before shipping substantial package changes, run `arch-lint-llm`. Also run
+  `check-silent-bypass` for payment, verification, settlement, redemption,
+  authentication, authorization, signing, or quorum changes.
 
 ## PR review guidelines
 
-When reviewing a pull request, lead with defects that could change behavior,
-weaken trust boundaries, lose funds, leak private data, or make the protocol
-harder to interoperate with. Treat style, naming, and wording as findings only
-when they obscure a load-bearing requirement or public vocabulary.
+Lead with defects that could change behavior, weaken trust boundaries, lose
+funds, leak private data, or reduce interoperability. Treat style, naming, and
+wording as findings only when they obscure a load-bearing requirement or public
+vocabulary.
 
-Review against the PR's base branch and the current documented model, not
-against older repository history. For stacked PRs, distinguish issues
-introduced by the head branch from context inherited from the base PR.
+Review against the PR base and current documented model. For stacked PRs,
+separate defects introduced by the head branch from inherited context.
 
-For changes under `packages/`, check the relevant actor boundary:
+For changes under `packages/`, verify that:
 
-- `packages/protocol/` defines interoperable Nostr/Cashu message formats.
-- `packages/sdk/` owns Customer, Provider, Oracle, payment, proof, attachment,
-  adapter, and request orchestration.
-- Examples and apps must not become a second owner for reusable package logic.
+- `packages/protocol/` remains the sole owner of interoperable Nostr and Cashu
+  message formats;
+- `packages/sdk/` owns actor orchestration and runtime implementations;
+- apps and examples do not become another owner of reusable package behavior.
 
-For payment, verification, redemption, signing, auth, or quorum changes, look
-for silent-bypass shapes: branches that appear valid but skip the load-bearing
-check, catches that turn failure into success, or functions whose name promises
-work they do not perform. Prefer a focused test or harness update over a broad
-rewrite recommendation.
+For payment, verification, redemption, signing, authentication, authorization,
+or quorum changes, look for plausible branches that skip the load-bearing
+check, turn failure into success, or promise work they do not perform. Prefer a
+focused regression test over a broad rewrite recommendation.
 
 ## Shared skills
 
 - Canonical skill definitions live in `skills/<skill-name>/SKILL.md`.
-- `.claude/skills` and `.codex/skills` must remain symlinks to `../skills`.
-- Add or edit skills under `skills/` only. Do not create divergent copies under
-  agent-specific directories.
-- Keep `SKILL.md` content portable by default. If a skill needs Claude-only or
-  Codex-only behavior, label that section explicitly.
-- When a request matches an available skill, use that skill first. If the
-  current agent does not expose the skill runner directly, follow the relevant
-  `skills/<skill-name>/SKILL.md` manually.
+- `.claude/skills` and `.codex/skills` remain symlinks to `../skills`.
+- Edit skills under `skills/` only. Keep them portable unless a section is
+  explicitly agent-specific.
+- When a request matches an available skill, use it first. If no skill runner is
+  exposed, follow its `SKILL.md` directly.
