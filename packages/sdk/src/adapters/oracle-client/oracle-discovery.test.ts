@@ -7,6 +7,7 @@ import { ProofSchema } from "../../schema.ts";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
 import type { OracleInfo } from "../../requests/domain/oracle-types.ts";
 import { ORACLE_ANNOUNCEMENT_VERSION } from "../nostr/events/versions.ts";
+import { isRecord } from "../../internal/runtime/types.ts";
 
 const FULL_ORACLE_INFO: OracleInfo = {
   id: "test-oracle",
@@ -264,7 +265,8 @@ test("parseOracleAnnouncementEvent rejects malformed capability values", () => {
 test("parseOracleAnnouncementEvent requires both capability arrays", () => {
   const identity = generateEphemeralIdentity();
   const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
-  const content = JSON.parse(event.content);
+  const content: unknown = JSON.parse(event.content);
+  if (!isRecord(content)) throw new TypeError("expected announcement object");
 
   for (
     const key of [
