@@ -19,8 +19,8 @@ Blocks:
 
 ## Summary
 
-The NUT-CTF proposal (cashubtc/nuts PR #337; reference implementation cdk PR
-#1666) standardizes conditional tokens
+The NUT-CTF proposal (`cashubtc/nuts#337`; reference implementation
+`cashubtc/cdk#1666`) standardizes conditional tokens
 redeemed by presenting DLC-style oracle attestation signatures to the mint,
 with an m-of-n oracle threshold built into the spec (`threshold` field,
 error 13027, 2-of-3 test vectors). If it lands, it replaces the parts of
