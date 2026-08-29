@@ -11,7 +11,7 @@ Use the narrowest class that can hold the decision.
 
 | Class | Meaning | Home |
 | --- | --- | --- |
-| Shared protocol requirement | A rule that compatible Customer, Provider, or Oracle implementations must follow to interoperate in Anchr v0. Includes Paid Request exchange links, Nostr message payloads, event tags, Proof Schema identifiers, Cashu settlement fields, and validation rules. | `specs/` |
+| Shared protocol requirement | A rule that compatible Customer, Provider, or Oracle implementations must follow to interoperate in Anchr v0. Includes Paid Request exchange links, Nostr message payloads, event tags, Proof Schema identifiers, Cashu settlement fields, and protocol-message validation rules. | `specs/` |
 | Security invariant | A funds, proof, oracle-release, or privacy property that Anchr claims as a safety guarantee. | `docs/threat-model.md` plus tests or attack-class cross references |
 | Architecture boundary | A role, layer, package, dependency-direction, naming, or adapter boundary that keeps the implementation aligned with the three-actor model. | `docs/architecture.md` |
 | Package API or behavior | An API, algorithm, port, error model, or test expectation defined by one package and called by others, but not exchanged between independent implementations. | The package `SPEC.md`, README, and colocated tests |
