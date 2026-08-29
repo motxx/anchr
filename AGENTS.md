@@ -9,9 +9,12 @@ Use `docs/architecture.md` for ownership and dependency boundaries,
 - Do not use `console.*` in `packages/`. Use the shared LogTape-backed logger.
 - Do not introduce `any` or double casts in `packages/`. Prefer type predicates;
   keep `unknown` and justified casts at parser or I/O boundaries.
-- Before 1.0, delete replaced paths. Do not add compatibility aliases,
-  deprecated shims, or parallel implementations. Lock changed behavior with a
-  test.
+- Before 1.0, delete replaced implementation paths. Do not add compatibility
+  aliases, deprecated shims, or parallel implementations. Required
+  agent-entrypoint symlinks are exempt. Lock changed behavior with a test.
+- Use top-level imports. Dynamic and type-position import expressions require a
+  same-line `// allow-dynamic-import: <reason>`. Dynamic `node:*` imports and
+  imports inside an `import.meta.main` entrypoint block are exempt.
 - Comments explain only a non-obvious current reason, invariant, workaround, or
   ordering constraint. Do not narrate change history.
 - Live documentation describes current behavior. Put durable design trade-offs
