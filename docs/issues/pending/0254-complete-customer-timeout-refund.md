@@ -71,6 +71,11 @@ capability and make its outcome recoverable across interruption.
   secrets in an error.
 - A restart test creates a lock, reconstructs the Customer with the same state
   store, advances past expiry, and refunds it exactly once.
+- A publication test inspects event content and tags and decrypts every
+  recipient payload, proving that the Customer refund secret key is never
+  published. The Payment Lock may expose only its refund public key; Provider
+  Redemption Tokens and proofs required by the selected Provider remain
+  allowed in that Provider's encrypted payload.
 - `deno task test:unit`, `deno task test:e2e:regtest`, and
   `deno task lint:strict` pass.
 

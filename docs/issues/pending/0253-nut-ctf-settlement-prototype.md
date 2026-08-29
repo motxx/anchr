@@ -19,8 +19,8 @@ Blocks:
 
 ## Summary
 
-The NUT-CTF proposal (cashubtc/nuts PR #337, open, author `joemphilips`;
-reference implementation cdk PR #1666) standardizes conditional tokens
+The NUT-CTF proposal (cashubtc/nuts PR #337; reference implementation cdk PR
+#1666) standardizes conditional tokens
 redeemed by presenting DLC-style oracle attestation signatures to the mint,
 with an m-of-n oracle threshold built into the spec (`threshold` field,
 error 13027, 2-of-3 test vectors). If it lands, it replaces the parts of
@@ -29,9 +29,9 @@ disappears (nothing secret exists before verification), verdict binding is
 structural (the attestation signature is the release material), and the
 threshold becomes t independent signatures — no DKG, no FROST signing
 rounds, no coordinator. Build a prototype Payment Lock implementation against the cdk
-fork to validate the mapping and identify problems in the specification while it
-is still open. Full replacement is out of scope: the spec is unmerged and no
-production mint supports it.
+fork to validate the mapping and identify compatibility gaps or open questions
+while the specification is still open. Full replacement is out of scope: the
+spec is unmerged and no production mint supports it.
 
 ## Rationale
 
@@ -50,28 +50,29 @@ production mint supports it.
 - Depends on 0246 because FROST must first commit to the verdict; those semantics are the
   compatibility target: with binding in place, swapping to CTF preserves
   guarantees instead of changing them.
-- Findings should be fed back to the PR #337 discussion.
 
 ## Acceptance
 
-- A prototype implements the Payment Lock capabilities required by each role (Customer
-  prepares and refunds the lock, Provider verifies its binding and redeems,
-  Oracle produces Release Material as attestation signatures) against a cdk build with the CTF
-  changes, exercised by an experimental e2e flow (Customer locks, Provider
-  redeems after oracle attestation, refund path on timeout).
+- The investigation produces one of two reproducible outcomes: a prototype
+  implements the required Customer prepare/refund, Provider verify/redeem, and
+  Oracle Release Material capabilities against a cdk build with the CTF
+  changes; or the findings identify the exact unsupported capability, pinned
+  revisions, reproduction command, observed failure, and effect on Anchr.
 - A written findings note records: the pinned NUT-CTF spec revision and cdk
   commit plus build configuration, mapping confirmations or deviations
   (hypotheses kept distinct from confirmed behavior), mint-visible metadata
-  compared to HTLC, and spec feedback filed or drafted.
+  compared to HTLC, and repository-local recommendations or follow-up work.
+- The prototype, reproducible setup, tests, and findings note are checked into
+  this repository. External publication is not required for completion.
 
 ## Requirement traceability
 
 | Requirement | Verification |
 | --- | --- |
-| Customer can prepare a CTF Payment Lock | The experimental e2e test registers a condition and inspects the resulting lock against the chosen Provider and Oracle outcome. |
-| Provider can verify binding and redeem after a passing attestation | The e2e test rejects a wrong Provider or condition and succeeds only with the expected attestation signatures. |
-| Customer can refund after timeout without a Provider redemption | A clock-controlled e2e case advances past the timeout and recovers the locked amount. |
-| Oracle Release Material is the attestation signatures | A protocol fixture round-trips the message format chosen by the investigation without introducing an unversioned Payment Lock type. |
+| Customer prepare is supported or confirmed unsupported by the pinned revision | The experimental e2e test registers and inspects a condition, or the findings record the unsupported result and reproduction command. |
+| Provider verify/redeem is supported or confirmed unsupported by the pinned revision | The e2e test rejects a wrong Provider or condition and redeems only with the expected attestation signatures, or the findings record the unsupported result and reproduction command. |
+| Customer timeout refund is supported or confirmed unsupported by the pinned revision | A clock-controlled e2e case recovers the locked amount after timeout, or the findings record the unsupported result and reproduction command. |
+| Oracle Release Material mapping is supported or confirmed unsupported by the pinned revision | A protocol fixture round-trips the chosen attestation-signature message format, or the findings record why that revision cannot supply it without an unversioned Payment Lock type. |
 | The prototype is reproducible | A setup check records and verifies the pinned NUT-CTF revision, cdk commit, and build configuration. |
 | Findings distinguish evidence from hypotheses | A findings-template lint requires a result for every mapping hypothesis and open-spec question listed above, with an evidence link or an explicit unresolved result. |
 | Privacy and trust effects are compared with HTLC | The findings check requires mint-visible fields and INV-07/INV-08 impact to be recorded. |

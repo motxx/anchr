@@ -49,6 +49,10 @@ closing together.
 - Unit test: malformed preimage returns `false`, not a throw.
 - Unit test: a share submitted under a slot the caller does not own is
   rejected.
+- Unit tests assert that each Provider-facing rejection uses its fixed public
+  reason and contains no expected or received hash, Release Material, proof,
+  mint response, internal exception text, or dynamically derived payment
+  detail. Diagnostic values remain only in local logs.
 
 ## Plan
 

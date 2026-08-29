@@ -63,8 +63,9 @@ internals. Move build/parse and the message payload types into
 - `PaymentLockType` and its accepted values are defined once in
   `@anchr/protocol`; Oracle registry payloads import that definition rather
   than defining or copying their own values.
-- `packages/sdk/src/adapters/nostr/events/` no longer defines protocol event
-  shapes; SDK call sites import from `@anchr/protocol`.
+- `packages/sdk/src/adapters/nostr/events/` is deleted; SDK call sites import
+  every moved builder, parser, payload type, and version from
+  `@anchr/protocol`.
 - The threat-model attestation-ownership sentence reflects protocol
   ownership (lock hash updated if an INV body changes; otherwise none).
 
@@ -75,16 +76,14 @@ internals. Move build/parse and the message payload types into
 | Kinds 30088, 30103, and every Oracle DM have one builder, parser, and payload type in `@anchr/protocol` | Protocol unit tests round-trip one valid event and reject one malformed event for every moved event type. |
 | Every moved JSON format owns an independent integer version, initially `0` | Builder tests inspect plaintext or decrypted JSON; parser tests reject a missing, string, and unsupported version for every moved format; a type test changes one fixture's version without changing its siblings. |
 | `PaymentLockType` and its accepted values have one owner | An architecture-lint rule rejects a value-set definition outside `@anchr/protocol`; its negative fixture defines an SDK copy and must fail. |
-| SDK adapters no longer define or re-export message formats | The no-export command below returns no matches, and SDK call sites compile using protocol imports. |
+| SDK adapters no longer define message formats | A filesystem assertion requires `packages/sdk/src/adapters/nostr/events/` to be absent, and SDK call sites compile using protocol imports. |
 | Threat-model ownership text names protocol | A focused docs assertion checks that the attestation section names `@anchr/protocol`, followed by `lint:invariants`. |
 | Both packages expose valid publish surfaces | `deno task publish:dry-run` succeeds for both packages. |
 
 ## Verification
 
-- `packages/sdk/src/adapters/nostr/events/` retains no exported symbol of
-  any kind (builders, parsers, payload types, constants, re-exports):
-  `rg "^export" packages/sdk/src/adapters/nostr/events/` returns nothing, or
-  the directory is deleted.
+- A filesystem assertion fails if
+  `packages/sdk/src/adapters/nostr/events/` exists after migration.
 - `deno task lint:strict`, `deno task test:unit`, and
   `deno task test:e2e:protocol` pass.
 - `deno task publish:dry-run` passes for both packages.
@@ -94,4 +93,4 @@ internals. Move build/parse and the message payload types into
 - Move `dm.ts` first (only needs the `NostrIdentity` → protocol keypair
   substitution), then `event-builders.ts` / `oracle-attestation.ts` together
   with the `oracle-types.ts` payload types.
-- Re-point SDK imports and delete the vacated files.
+- Re-point SDK imports and delete the vacated directory.

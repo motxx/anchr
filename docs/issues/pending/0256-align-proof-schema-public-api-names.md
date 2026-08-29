@@ -67,8 +67,13 @@ responsibility where that is more accurate than mechanically adding a prefix.
 
 ## Verification
 
+- A checked-in public-API inventory test enumerates protocol and SDK exports
+  and package subpaths. It fails when a public `Schema*` identifier or
+  schema-named subpath lacks a classification from Acceptance, or when a
+  replaced name remains exported.
 - No obsolete public names are expected after the migration:
-  `rg "SchemaUri|isSchemaUri|UnknownSchemaError|InvalidSchemaUriError|SchemaBundle|registerSchemaBundle|SchemaProducer|SchemaVerifier|SchemaEvidence|SchemaOptions|SchemaConfig|SchemaVerificationError" packages/protocol packages/sdk README.md docs specs examples`.
+  `rg "SchemaUri|isSchemaUri|UnknownSchemaError|InvalidSchemaUriError|SchemaBundle|registerSchemaBundle|SchemaProducer|SchemaVerifier|SchemaEvidence|SchemaOptions|SchemaConfig|SchemaVerificationError" packages/protocol packages/sdk README.md docs specs examples --glob '!docs/issues/**'`
+  returns no matches.
 - `deno task publish:dry-run`, `deno task lint:strict`, and
   `deno task test:unit` pass.
 
