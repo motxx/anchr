@@ -27,7 +27,7 @@ today without leaving any cryptographic trace:
 
 1. **Unverified release** — a colluding or compromised threshold signs the
    spend messages for a request whose verification never passed. The
-   resulting signature is byte-shape-identical to an honest release; even
+   resulting signature has the same byte structure as an honest release; even
    the defrauded Customer cannot distinguish theft from a legitimate payout.
 2. **Equivocation** — the quorum publishes a kind 30103 attestation saying
    `passed: false` while covertly producing release signatures for the
@@ -42,11 +42,11 @@ proof (two contradictory signatures under one group key).
 
 ## Rationale
 
-- Constraint: NUT-11 `SIG_INPUTS` fixes the mint-facing message as the proof
+- Constraint: NUT-11 `SIG_INPUTS` fixes the message given to the mint as the proof
   secret — the mint-verified signature cannot carry the verdict. The binding
   must be an additional quorum-signed statement produced in the same signing
   flow (coordinator session), such that partial signers refuse to co-sign
-  spend messages outside a verdict-bound session.
+  spend messages outside a session that commits to the verdict.
 - `docs/threat-model.md` already limits INV-02 to an implementation
   invariant, "not a Byzantine-oracle guarantee"; this issue is the missing
   mitigation for that documented gap.
@@ -79,6 +79,17 @@ proof (two contradictory signatures under one group key).
   refused, (b) a verdict statement contradicting a published attestation for
   the same query is detectable from the two artifacts alone.
 
+## Requirement traceability
+
+| Requirement | Verification |
+| --- | --- |
+| The verdict statement covers group key, query, proof, and verdict | Canonical-serialization vectors fix all four fields; changing or omitting any one changes the domain-separated digest and invalidates the quorum signature. |
+| Spend signatures and the verdict statement belong to one signing session | Coordinator and signer tests refuse a session without the statement digest and refuse partial signatures replayed under a different digest. |
+| NUT-11 spend messages remain unchanged | A compatibility vector fixes the proof-secret-derived spend messages before and after this change. |
+| Release without a valid statement fails closed | An e2e/FROST negative test obtains no usable spend signatures when the statement is absent or invalid. |
+| Contradictory release and attestation are independently detectable | A test accepts the two signed artifacts as its only evidence and reports the conflicting verdict for the same group key and query. |
+| The HTLC-only limitation remains explicit | `lint:invariants` checks INV-C2 and the mint-layer table against the updated lock entry. |
+
 ## Verification
 
 - `deno task test:e2e:frost` passes, including the new negative cases.
@@ -88,5 +99,5 @@ proof (two contradictory signatures under one group key).
 
 - Extend the signing-session message derivation to include the verdict
   statement; thread it through `frost-coordinator.ts` /
-  `frost-signing-coordinator.ts` and the signer sidecar contract.
+  `frost-signing-coordinator.ts` and the signer sidecar API.
 - Add the threat-model entry and tests.

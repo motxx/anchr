@@ -52,6 +52,16 @@ production path with failing proof material and asserts no preimage leaves.
 - `docs/threat-model.md` INV-02 lists the new test; the INV-02 entry in
   `docs/threat-model.lock.json` is updated with a justification.
 
+## Requirement traceability
+
+| Requirement | Verification |
+| --- | --- |
+| The test reaches the production Oracle handler | The test imports the production entry point, and a guard test rejects use of `@anchr/sdk/testing` or `createQueryService` in this fixture. |
+| Malformed payload cannot release a preimage | The adversarial case asserts no preimage DM is built or published and the preimage store count is unchanged. |
+| Invalid presentation cannot release a preimage | The adversarial case asserts the same three negative effects. |
+| Wrong Provider key cannot release a preimage | The adversarial case asserts the same three negative effects. |
+| INV-02 points to the production-path test | `lint:invariants` checks the test reference and the reviewed lock-file change. |
+
 ## Verification
 
 - The new test fails if the production rejection path is made to leak the

@@ -1,4 +1,4 @@
-# Promote requests/ to the Oracle-owned state machine and revise ADR 0003
+# Move the request state machine to the Oracle and revise ADR 0003
 
 Created: 2026-07-26
 Model: Claude Opus 5
@@ -61,7 +61,7 @@ files.
   the promoted machine; no lifecycle status computation remains inline in
   `adapters/nostr/oracle-service.ts` / `oracle-handlers.ts`.
 - Pure transition vocabulary lives in `@anchr/protocol`; the machine lives in
-  an Oracle-owned module; the `requests/domain` and `requests/application`
+  a module under the Oracle; the `requests/domain` and `requests/application`
   directories no longer exist.
 - ADR 0003 states Oracle ownership (protocol owns transition vocabulary,
   roles own their projections); E026/E029 are retired, with boundary
@@ -69,6 +69,18 @@ files.
 - Release delivery is crash-safe: a durable delivery intent (outbox) with an
   idempotency key tied to the request and its state version covers the gap
   between committing a verified state and publishing the delivery DM.
+
+## Requirement traceability
+
+| Requirement | Verification |
+| --- | --- |
+| Production Oracle transitions through the promoted machine | Production-path tests drive the daemon and assert persisted state after every accepted and rejected transition; a source-boundary check rejects inline lifecycle status computation in the old handlers. |
+| Oracle owns state; protocol owns only pure transition vocabulary | Architecture fixtures accept the intended imports and reject imports from protocol to Oracle and state-machine definitions outside the Oracle. |
+| Customer and Provider keep only request-lifetime projections | Role tests rebuild their projections from protocol messages without loading the Oracle store or machine. |
+| Old `requests/domain` and `requests/application` layers are gone | The no-match command below and tests of package exports cover definitions, imports, and re-exports. |
+| ADR 0003 and lint rules describe the new ownership | A docs/lint consistency test checks the ADR ownership rows and confirms E026/E029 are absent after 0250's replacement rule exists. |
+| Verified release survives a crash before publication | A restart test crashes after state and outbox commit, then publishes exactly one delivery on retry. |
+| Retry after publication is idempotent | A restart test crashes after publication but before acknowledgement and proves the same idempotency key cannot cause a second effective delivery. |
 
 ## Verification
 

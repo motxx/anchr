@@ -41,7 +41,7 @@ closing together.
 - `verifyPreimageHash` validates `/^([0-9a-f]{2})+$/i` and returns `false` on
   malformed input.
 - Share submissions are authenticated to the signer identity.
-- Provider-facing rejection wire messages are generic (details stay in local
+- Rejection messages sent to the Provider are generic (details stay in local
   logs).
 
 ## Verification
