@@ -222,6 +222,7 @@ test("buildQueryResponseEvent can include an oracle-readable encrypted payload",
     provider.publicKey,
   );
   expect(parsed).not.toBe(null);
+  expect(parsed?.version).toBe(QUERY_RESPONSE_VERSION);
   expect(parsed?.query_id).toBe("query_123");
   expect(parsed?.request_event_id).toBe("req123");
   expect(parsed?.schema).toBe("https://anchr-spec.org/spec/proof/tlsn/v1");
