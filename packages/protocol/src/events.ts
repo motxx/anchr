@@ -372,8 +372,8 @@ export interface QueryResponsePayload
   schema: string;
   /** Verified response payload (format defined by the schema). */
   data: unknown;
-  /** Proof bytes (format defined by the schema). Encoded as base64 or hex by the schema. */
-  proof: Uint8Array | string;
+  /** Proof evidence encoded as specified by the Proof Schema. */
+  proof: string;
 }
 
 /** Oracle-readable copy of a provider result, encrypted in a tag. */
@@ -384,7 +384,7 @@ export interface OracleQueryResponsePayload
   /** Response payload whose format is defined by the schema. */
   data: unknown;
   /** Proof evidence encoded as specified by the schema. */
-  proof: Uint8Array | string;
+  proof: string;
   /** Matches the request payload's query_id. */
   query_id: string;
   /** Original kind 5300 request event id this result answers. */
@@ -404,7 +404,9 @@ export function buildQueryResponseEvent(
   identity: Keypair,
   requestEventId: string,
   customerPubkey: string,
-  payload: Omit<QueryResponsePayload, "version">,
+  payload: Omit<QueryResponsePayload, "version" | "proof"> & {
+    proof: Uint8Array | string;
+  },
   oraclePubkey?: string,
   queryId?: string,
 ): Event {
