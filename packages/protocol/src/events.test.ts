@@ -9,6 +9,8 @@ import {
   buildQueryRequestEvent,
   buildQueryResponseEvent,
   buildSelectionFeedbackEvent,
+  HASH_REQUEST_VERSION,
+  HASH_RESPONSE_VERSION,
   parseHashRequestEvent,
   parseHashResponseEvent,
   parseOfferFeedbackEvent,
@@ -17,9 +19,13 @@ import {
   parseQueryRequestEvent,
   parseQueryResponseEvent,
   parseSelectionFeedbackEvent,
+  PREIMAGE_DELIVERY_VERSION,
+  QUERY_REQUEST_VERSION,
+  QUERY_RESPONSE_VERSION,
   type QueryRequestPayload,
 } from "./events.ts";
 import {
+  decryptNip44,
   encryptNip44,
   findAllTagValues,
   findTagValue,
@@ -31,8 +37,8 @@ import {
 } from "./nostr.ts";
 
 function samplePayload(
-  overrides?: Partial<QueryRequestPayload>,
-): QueryRequestPayload {
+  overrides?: Partial<Omit<QueryRequestPayload, "version">>,
+): Omit<QueryRequestPayload, "version"> {
   return {
     query_id: "query_abc",
     schema: "https://anchr-spec.org/spec/proof/tlsn/v1",
@@ -72,6 +78,7 @@ test("parseQueryRequestEvent recovers a payload from the built event (round-trip
   const parsed = parseQueryRequestEvent(event);
 
   expect(parsed).not.toBe(null);
+  expect(parsed?.version).toBe(QUERY_REQUEST_VERSION);
   expect(parsed?.query_id).toBe(payload.query_id);
   expect(parsed?.schema).toBe(payload.schema);
   expect(parsed?.customer_pubkey).toBe(payload.customer_pubkey);
@@ -85,7 +92,7 @@ test("buildQueryRequestEvent publishes only the Request Notice allowlist", () =>
   const event = buildQueryRequestEvent(identity, payload);
   const content = JSON.parse(event.content);
 
-  expect(content).toEqual(payload);
+  expect(content).toEqual({ ...payload, version: 0 });
   expect(Object.keys(content).sort()).toEqual([
     "customer_pubkey",
     "expires_at",
@@ -93,6 +100,7 @@ test("buildQueryRequestEvent publishes only the Request Notice allowlist", () =>
     "oracle_pubkey",
     "query_id",
     "schema",
+    "version",
   ]);
   expect(content).not.toHaveProperty("predicate");
   expect(content).not.toHaveProperty("context");
@@ -225,6 +233,7 @@ test("buildQueryResponseEvent can include an oracle-readable encrypted payload",
     customer.secretKey,
     provider.publicKey,
   );
+  expect(customerParsed?.version).toBe(QUERY_RESPONSE_VERSION);
   expect(customerParsed?.schema).toBe(
     "https://anchr-spec.org/spec/proof/tlsn/v1",
   );
@@ -251,6 +260,7 @@ test("feedback events expose causal tags and JSON payloads", () => {
   expect(offer.tags).toContainEqual(["p", customer.publicKey]);
   expect(offer.tags).toContainEqual(["status", "payment-required"]);
   expect(JSON.parse(offer.content)).toEqual({
+    version: 0,
     status: "payment-required",
     provider_pubkey: provider.publicKey,
     amount_sats: 42,
@@ -318,7 +328,7 @@ test("parseSelectionFeedbackEvent rejects selection without selected amount", ()
       kind: KIND_QUERY_FEEDBACK,
       created_at: 123456,
       content: encryptNip44(
-        JSON.stringify({ ...payload, execution }),
+        JSON.stringify({ ...payload, execution, version: 0 }),
         customer.secretKey,
         provider.publicKey,
       ),
@@ -326,7 +336,6 @@ test("parseSelectionFeedbackEvent rejects selection without selected amount", ()
         ["e", "req123", "", "request"],
         ["p", provider.publicKey],
         ["status", "processing"],
-        ["v", "0"],
       ],
     },
     customer.secretKey,
@@ -355,6 +364,7 @@ test("preimage delivery DMs bind release material to the request event", () => {
     oracle.publicKey,
   );
   expect(parsed).toEqual({
+    version: PREIMAGE_DELIVERY_VERSION,
     query_id: "query_123",
     request_event_id: "req123",
     preimage: "aa".repeat(32),
@@ -376,6 +386,7 @@ test("hash bootstrap DM round-trips request and response", () => {
     customer.publicKey,
   );
   expect(parsedRequest).toEqual({
+    version: HASH_REQUEST_VERSION,
     type: "hash_request",
     query_id: "q-bootstrap-1",
   });
@@ -391,6 +402,7 @@ test("hash bootstrap DM round-trips request and response", () => {
     oracle.publicKey,
   );
   expect(parsedResponse).toEqual({
+    version: HASH_RESPONSE_VERSION,
     type: "hash_response",
     query_id: "q-bootstrap-1",
     hash: "ab".repeat(32),
@@ -418,19 +430,19 @@ test("hash bootstrap parsers reject other DM payloads", () => {
   ).toBe(null);
 });
 
-test("builders stamp the v0 wire-version tag", () => {
+test("builders put version 0 in every Anchr JSON object", () => {
   const customer = generateKeypair();
   const provider = generateKeypair();
 
   const request = buildQueryRequestEvent(customer, samplePayload());
-  expect(findTagValue(request, "v")).toBe("0");
+  expect(JSON.parse(request.content).version).toBe(0);
 
   const offer = buildOfferFeedbackEvent(provider, "req-v", customer.publicKey, {
     status: "payment-required",
     provider_pubkey: provider.publicKey,
     amount_sats: 1,
   });
-  expect(findTagValue(offer, "v")).toBe("0");
+  expect(JSON.parse(offer.content).version).toBe(0);
 
   const selection = buildSelectionFeedbackEvent(customer, "req-v", {
     status: "processing",
@@ -445,7 +457,13 @@ test("builders stamp the v0 wire-version tag", () => {
       locktime_seconds: 123456,
     },
   });
-  expect(findTagValue(selection, "v")).toBe("0");
+  expect(
+    JSON.parse(decryptNip44(
+      selection.content,
+      provider.secretKey,
+      customer.publicKey,
+    )).version,
+  ).toBe(0);
 
   const response = buildQueryResponseEvent(
     provider,
@@ -457,25 +475,76 @@ test("builders stamp the v0 wire-version tag", () => {
       proof: "p",
     },
   );
-  expect(findTagValue(response, "v")).toBe("0");
+  expect(
+    JSON.parse(decryptNip44(
+      response.content,
+      customer.secretKey,
+      provider.publicKey,
+    )).version,
+  ).toBe(0);
+
+  const preimage = buildPreimageDeliveryEvent(provider, customer.publicKey, {
+    query_id: "query-v",
+    request_event_id: "req-v",
+    preimage: "aa".repeat(32),
+  });
+  expect(
+    JSON.parse(decryptNip44(
+      preimage.content,
+      customer.secretKey,
+      provider.publicKey,
+    )).version,
+  ).toBe(0);
+
+  const hashRequest = buildHashRequestEvent(customer, provider.publicKey, {
+    type: "hash_request",
+    query_id: "query-v",
+  });
+  expect(
+    JSON.parse(decryptNip44(
+      hashRequest.content,
+      provider.secretKey,
+      customer.publicKey,
+    )).version,
+  ).toBe(0);
+
+  const hashResponse = buildHashResponseEvent(provider, customer.publicKey, {
+    type: "hash_response",
+    query_id: "query-v",
+    hash: "bb".repeat(32),
+  });
+  expect(
+    JSON.parse(decryptNip44(
+      hashResponse.content,
+      customer.secretKey,
+      provider.publicKey,
+    )).version,
+  ).toBe(0);
 });
 
-test("parsers ignore events carrying an incompatible wire version", () => {
+test("parsers reject a missing, non-integer, or unsupported JSON version", () => {
   const customer = generateKeypair();
   const provider = generateKeypair();
 
   const request = buildQueryRequestEvent(customer, samplePayload());
   const futureRequest = {
     ...request,
-    tags: request.tags.map((t) => (t[0] === "v" ? ["v", "1"] : t)),
+    content: JSON.stringify({ ...JSON.parse(request.content), version: 1 }),
   };
   expect(parseQueryRequestEvent(futureRequest)).toBe(null);
-  // Absent v tag still parses as v0.
-  const untagged = {
+  const stringVersionRequest = {
     ...request,
-    tags: request.tags.filter((t) => t[0] !== "v"),
+    content: JSON.stringify({ ...JSON.parse(request.content), version: "0" }),
   };
-  expect(parseQueryRequestEvent(untagged)?.query_id).toBe("query_abc");
+  expect(parseQueryRequestEvent(stringVersionRequest)).toBe(null);
+  const { version: _version, ...contentWithoutVersion } = JSON.parse(
+    request.content,
+  );
+  const unversioned = {
+    ...request,
+    content: JSON.stringify(contentWithoutVersion),
+  };
+  expect(parseQueryRequestEvent(unversioned)).toBe(null);
 
   const offer = buildOfferFeedbackEvent(
     provider,
@@ -489,7 +558,7 @@ test("parsers ignore events carrying an incompatible wire version", () => {
   );
   const futureOffer = {
     ...offer,
-    tags: offer.tags.map((t) => (t[0] === "v" ? ["v", "2"] : t)),
+    content: JSON.stringify({ ...JSON.parse(offer.content), version: 2 }),
   };
   expect(parseOfferFeedbackEvent(futureOffer)).toBe(null);
 });

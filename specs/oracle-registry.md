@@ -22,7 +22,7 @@ Oracles publish a Nostr parametrized replaceable event (NIP-78 style):
 | `kind`    | `30088`                           |
 | `d` tag   | Oracle ID (unique identifier)     |
 | `t` tags  | `anchr-oracle`                    |
-| `s` tags  | Supported proof schema URLs       |
+| `s` tags  | Supported Proof Schema URLs       |
 | `content` | JSON-encoded `OracleAnnouncement` |
 
 ### Tags
@@ -40,9 +40,9 @@ Oracles publish a Nostr parametrized replaceable event (NIP-78 style):
 }
 ```
 
-Each `s` tag is an exact proof schema URL the Oracle claims to verify. The
-schema URL is the only verification capability key in the registry; schema
-modules own any local predicate, evidence, or check vocabulary.
+Each `s` tag is an exact Proof Schema URL the Oracle claims to verify. The
+Proof Schema URL is the only verification capability key in the registry;
+Proof Schema modules define any local predicate, evidence, or check vocabulary.
 
 ### OracleAnnouncement
 
@@ -50,10 +50,11 @@ The `content` field contains a JSON object:
 
 | Field                          | Required | Description                                                       |
 | ------------------------------ | -------- | ----------------------------------------------------------------- |
+| `version`                      | yes      | Anchr JSON version; MUST be integer `0`                           |
 | `name`                         | yes      | Human-readable Oracle name                                        |
 | `endpoint`                     | no       | Optional Oracle-operated HTTP adapter URL                         |
 | `fee_ppm`                      | yes      | Fee in parts-per-million of the payment amount (e.g., 50000 = 5%) |
-| `supported_schemas`            | yes      | Array of proof schema URLs this Oracle supports                   |
+| `supported_schemas`            | yes      | Array of Proof Schema URLs this Oracle supports                   |
 | `supported_payment_lock_types` | yes      | Array of Payment Lock types: `htlc`, `p2pk_frost`                 |
 | `min_amount_sats`              | no       | Minimum payment amount this Oracle accepts                        |
 | `max_amount_sats`              | no       | Maximum payment amount this Oracle accepts                        |
@@ -63,6 +64,7 @@ The `content` field contains a JSON object:
 
 ```json
 {
+  "version": 0,
   "name": "TLSN and C2PA Oracle",
   "fee_ppm": 50000,
   "supported_schemas": [
@@ -87,7 +89,7 @@ Customers discover Oracles by querying Nostr relays:
 }
 ```
 
-To filter by schema capability:
+To filter by Proof Schema:
 
 ```json
 {

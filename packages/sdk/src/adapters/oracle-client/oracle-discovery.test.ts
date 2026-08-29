@@ -6,6 +6,7 @@ import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import { ProofSchema } from "../../schema.ts";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
 import type { OracleInfo } from "../../requests/domain/oracle-types.ts";
+import { ORACLE_ANNOUNCEMENT_VERSION } from "../nostr/events/versions.ts";
 
 const FULL_ORACLE_INFO: OracleInfo = {
   id: "test-oracle",
@@ -61,6 +62,7 @@ test("buildOracleAnnouncementEvent content is valid JSON with announcement paylo
   const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
 
   const content = JSON.parse(event.content);
+  expect(content.version).toBe(ORACLE_ANNOUNCEMENT_VERSION);
   expect(content.name).toBe("Test Oracle");
   expect(content.fee_ppm).toBe(50000);
   expect(content.supported_schemas).toEqual(FULL_ORACLE_INFO.supported_schemas);
@@ -125,6 +127,7 @@ test("parseOracleAnnouncementEvent parses a valid event", () => {
 
   const announcement = parseOracleAnnouncementEvent(event);
   expect(announcement).not.toBeNull();
+  expect(announcement!.version).toBe(ORACLE_ANNOUNCEMENT_VERSION);
   expect(announcement!.id).toBe("test-oracle");
   expect(announcement!.name).toBe("Test Oracle");
   expect(announcement!.endpoint).toBe("https://oracle.example.com");
@@ -156,6 +159,21 @@ test("parseOracleAnnouncementEvent returns null for invalid content", () => {
 
   const result = parseOracleAnnouncementEvent(badEvent);
   expect(result).toBeNull();
+});
+
+test("parseOracleAnnouncementEvent rejects a missing or unsupported version", () => {
+  const identity = generateEphemeralIdentity();
+  const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
+  const { version: _version, ...unversioned } = JSON.parse(event.content);
+
+  expect(parseOracleAnnouncementEvent({
+    ...event,
+    content: JSON.stringify(unversioned),
+  })).toBeNull();
+  expect(parseOracleAnnouncementEvent({
+    ...event,
+    content: JSON.stringify({ ...unversioned, version: 1 }),
+  })).toBeNull();
 });
 
 test("parseOracleAnnouncementEvent returns null when d tag is missing", () => {
@@ -194,6 +212,7 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
     created_at: 1700000000,
     tags: [["d", "minimal"]],
     content: JSON.stringify({
+      version: ORACLE_ANNOUNCEMENT_VERSION,
       name: "Minimal",
       fee_ppm: 5000,
       supported_schemas: [],
@@ -222,6 +241,7 @@ test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
     created_at: 1700000000,
     tags: [["d", "schema-filter"]],
     content: JSON.stringify({
+      version: ORACLE_ANNOUNCEMENT_VERSION,
       name: "Schema Filter",
       fee_ppm: 5000,
       supported_schemas: [
@@ -246,6 +266,7 @@ test("parseOracleAnnouncementEvent ignores obsolete supported_escrow_types field
     created_at: 1700000000,
     tags: [["d", "old-field"]],
     content: JSON.stringify({
+      version: ORACLE_ANNOUNCEMENT_VERSION,
       name: "Old Field",
       fee_ppm: 5000,
       supported_schemas: [],
