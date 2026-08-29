@@ -160,7 +160,7 @@ export async function createBountyToken(
  * Encode proofs into a transferable Cashu token string.
  */
 export function encodeToken(mintUrl: string, proofs: Proof[]): string {
-  // V4 ("cashuB") serialization is pinned by the v0 wire contract.
+  // The interoperable v0 contract requires V4 ("cashuB") serialization.
   return getEncodedToken({ mint: mintUrl, proofs }, { version: 4 });
 }
 
@@ -194,30 +194,36 @@ export async function verifyToken(
 
     // Query the Cashu mint to verify proofs are actually unspent
     const wallet = getCashuWallet(options);
-    if (wallet) {
-      try {
-        await wallet.loadMint();
-        const states = await wallet.checkProofsStates(decoded.proofs);
-        const spent = states.filter((s) => s.state !== "UNSPENT");
-        if (spent.length > 0) {
-          return {
-            valid: false,
-            amountSats: totalAmount,
-            error: `${spent.length} proof(s) already spent on mint`,
-          };
-        }
-        log.error(
-          `Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`,
-        );
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        log.error(`Mint checkstate failed:`, msg);
+    if (!wallet) {
+      return {
+        valid: false,
+        amountSats: totalAmount,
+        error: "Cashu mint is not configured; proof state cannot be verified",
+      };
+    }
+
+    try {
+      await wallet.loadMint();
+      const states = await wallet.checkProofsStates(decoded.proofs);
+      const spent = states.filter((s) => s.state !== "UNSPENT");
+      if (spent.length > 0) {
         return {
           valid: false,
           amountSats: totalAmount,
-          error: `Mint verification failed: ${msg}`,
+          error: `${spent.length} proof(s) already spent on mint`,
         };
       }
+      log.error(
+        `Token verified on mint: ${totalAmount} sats, ${decoded.proofs.length} proofs UNSPENT`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      log.error(`Mint checkstate failed:`, msg);
+      return {
+        valid: false,
+        amountSats: totalAmount,
+        error: `Mint verification failed: ${msg}`,
+      };
     }
 
     return { valid: true, amountSats: totalAmount };
