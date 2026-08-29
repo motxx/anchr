@@ -34,14 +34,20 @@ function isPaymentLockType(x: unknown): x is PaymentLockType {
   return typeof x === "string" && PAYMENT_LOCK_TYPE_SET.has(x);
 }
 
-function filterSchemaUris(value: unknown): SchemaUri[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isSchemaUri);
+function requireSchemaUris(value: unknown): SchemaUri[] {
+  if (!Array.isArray(value) || !value.every(isSchemaUri)) {
+    throw new TypeError("expected supported_schemas to contain HTTPS URLs");
+  }
+  return value;
 }
 
-function filterPaymentLockTypes(value: unknown): PaymentLockType[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isPaymentLockType);
+function requirePaymentLockTypes(value: unknown): PaymentLockType[] {
+  if (!Array.isArray(value) || !value.every(isPaymentLockType)) {
+    throw new TypeError(
+      "expected supported_payment_lock_types to contain known values",
+    );
+  }
+  return value;
 }
 
 /** Parsed oracle announcement from a Nostr kind 30088 event. */
@@ -84,8 +90,8 @@ export function parseOracleAnnouncementEvent(
       name: requireString(content, "name"),
       endpoint: optionalString(content, "endpoint"),
       fee_ppm: requireNumber(content, "fee_ppm"),
-      supported_schemas: filterSchemaUris(content.supported_schemas),
-      supported_payment_lock_types: filterPaymentLockTypes(
+      supported_schemas: requireSchemaUris(content.supported_schemas),
+      supported_payment_lock_types: requirePaymentLockTypes(
         content.supported_payment_lock_types,
       ),
       min_amount_sats: optionalNumber(content, "min_amount_sats"),

@@ -216,6 +216,7 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
       name: "Minimal",
       fee_ppm: 5000,
       supported_schemas: [],
+      supported_payment_lock_types: [],
     }),
     pubkey: "deadbeef",
     id: "fake",
@@ -235,7 +236,7 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
   expect(result!.description).toBeUndefined();
 });
 
-test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
+test("parseOracleAnnouncementEvent rejects malformed capability values", () => {
   const event = {
     kind: 30088,
     created_at: 1700000000,
@@ -249,6 +250,7 @@ test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
         "tlsn",
         "http://anchr-spec.org/spec/proof/tlsn/v1",
       ],
+      supported_payment_lock_types: [],
     }),
     pubkey: "deadbeef",
     id: "fake",
@@ -256,8 +258,38 @@ test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
   };
 
   const result = parseOracleAnnouncementEvent(event);
-  expect(result).not.toBeNull();
-  expect(result!.supported_schemas).toEqual([ProofSchema.TlsnV1]);
+  expect(result).toBeNull();
+});
+
+test("parseOracleAnnouncementEvent requires both capability arrays", () => {
+  const identity = generateEphemeralIdentity();
+  const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
+  const content = JSON.parse(event.content);
+
+  for (
+    const key of [
+      "supported_schemas",
+      "supported_payment_lock_types",
+    ] as const
+  ) {
+    const { [key]: _removed, ...withoutRequiredField } = content;
+    expect(parseOracleAnnouncementEvent({
+      ...event,
+      content: JSON.stringify(withoutRequiredField),
+    })).toBeNull();
+    expect(parseOracleAnnouncementEvent({
+      ...event,
+      content: JSON.stringify({ ...content, [key]: "invalid" }),
+    })).toBeNull();
+  }
+
+  expect(parseOracleAnnouncementEvent({
+    ...event,
+    content: JSON.stringify({
+      ...content,
+      supported_payment_lock_types: ["unknown"],
+    }),
+  })).toBeNull();
 });
 
 test("parseOracleAnnouncementEvent ignores obsolete supported_escrow_types field", () => {
@@ -270,6 +302,7 @@ test("parseOracleAnnouncementEvent ignores obsolete supported_escrow_types field
       name: "Old Field",
       fee_ppm: 5000,
       supported_schemas: [],
+      supported_payment_lock_types: [],
       supported_escrow_types: ["htlc"],
     }),
     pubkey: "deadbeef",

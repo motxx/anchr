@@ -60,6 +60,11 @@ The `content` field contains a JSON object:
 | `max_amount_sats`              | no       | Maximum payment amount this Oracle accepts                        |
 | `description`                  | no       | Free-text description of the Oracle service                       |
 
+`supported_schemas` and `supported_payment_lock_types` MUST be present even
+when empty. Parsers MUST reject a non-array value, a Proof Schema value that is
+not an HTTPS URL, or an unknown Payment Lock type rather than dropping the
+invalid value.
+
 ### Example
 
 ```json
