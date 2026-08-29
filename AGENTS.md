@@ -15,7 +15,7 @@ duplicating the layout rules here.
 When reviewing a pull request, lead with defects that could change behavior,
 weaken trust boundaries, lose funds, leak private data, or make the protocol
 harder to interoperate with. Treat style, naming, and wording as findings only
-when they obscure a load-bearing contract or public vocabulary.
+when they obscure a load-bearing requirement or public vocabulary.
 
 Review against the PR's base branch and the current documented model, not
 against older repository history. For stacked PRs, distinguish issues
@@ -23,7 +23,7 @@ introduced by the head branch from context inherited from the base PR.
 
 For changes under `packages/`, check the relevant actor boundary:
 
-- `packages/protocol/` owns interoperable Nostr/Cashu wire contracts.
+- `packages/protocol/` defines interoperable Nostr/Cashu message formats.
 - `packages/sdk/` owns Customer, Provider, Oracle, payment, proof, attachment,
   adapter, and request orchestration.
 - Examples and apps must not become a second owner for reusable package logic.

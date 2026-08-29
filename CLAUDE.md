@@ -8,8 +8,8 @@ the code and `docs/`.
   `deno task <name>`. Never `npm`/`yarn`/`pnpm`/`ts-node`/`vitest`/`jest`.
 - HTTP: `Deno.serve()` + Hono. WebSocket: built-in. Env: `Deno.env.get/set/delete`.
   Never `express`, `ws`, `process.env`, `dotenv`.
-- Runtime helpers belong in `packages/sdk/src/` unless they define the
-  interoperable Nostr/Cashu contract owned by `@anchr/protocol`.
+- Runtime helpers belong in `packages/sdk/src/` unless they implement an
+  interoperable Nostr/Cashu message format owned by `@anchr/protocol`.
 
 ## Logging
 **No `console.*`** in `packages/` — emit through the shared
@@ -35,8 +35,8 @@ history (`added for X` / `previously did Y`) — caught by
 `lint:no-history-comments`.
 
 ## Documentation prose
-Live docs, specs, README files, and architecture notes describe the current
-target contract only. Do not include meta-commentary about removed designs,
+Live docs, specs, README files, and architecture notes describe only the current
+target behavior. Do not include meta-commentary about removed designs,
 discarded alternatives, or repository history when that history has no runtime
 surface in the current code. Record durable trade-offs in ADRs only when they
 meet the ADR bar; otherwise delete the historical explanation.
@@ -113,8 +113,8 @@ recorded a clean review of the exact `packages/` diff being shipped
 `.silent-bypass-verified.json`; small diffs are exempt).
 
 ## Layout
-- `packages/protocol/` — Nostr/Cashu v0 wire contract, event helpers,
-  protocol types, schema identifiers, and Nostr compatibility helpers.
+- `packages/protocol/` — interoperable Nostr/Cashu v0 message formats, event helpers,
+  protocol types, Proof Schema identifiers, and Nostr compatibility helpers.
 - `packages/sdk/` — Customer, Provider, Oracle orchestration, payment helpers,
   proof helpers, attachments, adapters, request internals, testing helpers, and
   the developer-facing SDK surface.
@@ -128,7 +128,7 @@ recorded a clean review of the exact `packages/` diff being shipped
   **Must reach Anchr through `@anchr/*` only** — relative paths into
   `packages/<pkg>/src/...` are an E023 violation (`e2e/` and `scripts/`
   are held to the same rule).
-- `specs/` — wire-format specs (CC0)
+- `specs/` — protocol message specifications (CC0)
 - `docs/architecture.md` — package layout
 - `docs/threat-model.md` — invariants
 - `docs/issues/` — tracked issues (`pending/` → `closed/`); manage with

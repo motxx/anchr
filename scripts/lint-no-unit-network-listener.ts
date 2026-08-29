@@ -91,7 +91,7 @@ function report(hits: Hit[]): void {
   }
   console.error(
     "\nUnit tests must not bind TCP listeners. Use in-process request " +
-      "helpers, dependency injection, or move wire-level coverage to " +
+      "helpers, dependency injection, or move coverage of protocol messages to " +
       "*.integration.test.ts.",
   );
 }

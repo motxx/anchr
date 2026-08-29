@@ -9,9 +9,9 @@ Anchr's SDK, protocol, security, verification, or issue workflow.
 - [Threat model](threat-model.md) - trust assumptions and security invariants.
 - [Universality boundaries](universality-boundaries.md) - where protocol,
   security, package, adapter, example, and harness rules belong.
-- [Architecture decision records](adr/) - durable substrate and wire-contract
+- [Architecture decision records](adr/) - durable protocol and substrate decisions
   decisions.
-- [Specs](../specs/) - CC0 wire-format and proof-schema contracts.
+- [Specs](../specs/) - CC0 message-format and Proof Schema specifications.
 
 ## Design Notes
 

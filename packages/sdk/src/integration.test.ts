@@ -8,7 +8,7 @@
  * What this file is NOT:
  *   - Not an end-to-end test against a real Nostr relay
  *   - Not an end-to-end test against a real Cashu mint
- *   - Not a verification that NUT-14 HTLC + NIP-44 actually work on the wire
+ *   - Not a verification that NUT-14 HTLC + NIP-44 work through a mint and relay
  *
  * The real e2e coverage lives at `e2e/regtest/sdk-integration.test.ts`
  * (run via `deno task test:e2e:regtest`), which exercises this same flow
