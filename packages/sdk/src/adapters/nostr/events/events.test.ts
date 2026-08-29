@@ -4,6 +4,7 @@ import { generateEphemeralIdentity } from "../../../identity.ts";
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import { ProofSchema } from "../../../schema.ts";
 import { buildOracleAnnouncementEvent } from "./events.ts";
+import { ORACLE_ANNOUNCEMENT_VERSION } from "./versions.ts";
 
 describe("oracle announcement events", () => {
   test("buildOracleAnnouncementEvent emits kind 30088 with schema tags", () => {
@@ -22,6 +23,7 @@ describe("oracle announcement events", () => {
     expect(event.tags).toContainEqual(["s", ProofSchema.TlsnV1]);
     expect(event.tags).toContainEqual(["relay", "wss://relay.example"]);
     const content = JSON.parse(event.content);
+    expect(content.version).toBe(ORACLE_ANNOUNCEMENT_VERSION);
     expect(content.name).toBe("Test Oracle");
     expect(content.fee_ppm).toBe(50_000);
     expect(content.supported_schemas).toEqual([ProofSchema.TlsnV1]);
