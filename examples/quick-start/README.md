@@ -2,9 +2,9 @@
 
 Status: Testnet
 
-Publish a Request Notice to a Nostr relay with SDK-built events
-and read it back. One actor, one relay round trip — the smallest observable
-proof that the SDK speaks the wire contract against a real relay.
+Publish a Request Notice to a Nostr relay with SDK-built events and read it
+back. One actor, one relay round trip — the smallest observable proof that the
+SDK follows the protocol specification against a real relay.
 
 ## User flow
 
@@ -26,11 +26,11 @@ Any NIP-01 relay works; a comma-separated list publishes to several. See
 
 - **Real dependency:** the relay you supply.
 - **No payment is locked.** The Request Notice carries only public discovery
-  fields — `query_id`, schema URL, ephemeral pubkeys, `max_amount_sats`, expiry.
+  fields — `query_id`, Proof Schema URL, ephemeral pubkeys, `max_amount_sats`, expiry.
   Payment locking and the full Customer/Provider/Oracle exchange are the
   [`paid-request-simulation`](../paid-request-simulation/) lesson.
-- **Nothing private touches the relay.** The canonical parser rejects
-  Request Notices carrying predicate, payment, or execution material
+- **Nothing private touches the relay.** The canonical parser rejects Request
+  Notices carrying predicate, payment, or execution material
   (`specs/messaging.md`).
 
 ## Smoke test

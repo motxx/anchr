@@ -10,7 +10,7 @@
  *   5. Evidence valid → deliver preimage via NIP-44 DM (kind 4)
  *   6. Evidence invalid → deliver rejection via NIP-44 DM (kind 4)
  *
- * Process concerns are the host's responsibility: wire SIGTERM/SIGINT to
+ * Process concerns are the host's responsibility: handle SIGTERM/SIGINT by calling
  * `service.stop()`, expose a health surface, and call
  * `QueryService.expireQueries()` on a schedule if a request store is
  * composed alongside the daemon.
