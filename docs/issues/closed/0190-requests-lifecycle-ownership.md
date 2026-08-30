@@ -78,3 +78,54 @@ owner before restructuring.
 - Compare the two lifecycles; choose one owner.
 - Split the resulting migration/cleanup into child issues (0191 executes the
   role-client refactor).
+
+Completed: 2026-07-06
+
+## Resolution
+
+Decision (maintainer-confirmed, 2026-07-06): the `requests/` aggregate is the
+single owner of the paid-request lifecycle. `customer.ts` / `provider.ts` are
+driven through `requests/application` services and their per-role status
+models are deleted; demoting the aggregate to `testing/` was rejected because
+it would leave the threat-model/attack e2e suites verifying throwaway code.
+
+Implemented by updating:
+
+- `docs/adr/0003-requests-aggregate-owns-lifecycle.md` (new — decision record)
+- `docs/architecture.md` (SDK Request Internals: single-owner sentence for the
+  lifecycle state machine, facade contract, ADR 0003 reference)
+- `docs/issues/pending/0191-decompose-role-client-god-functions.md` (direction
+  locked to ADR 0003: reuse `requests/` stages, delete per-role status models,
+  shrink the E026 whitelist)
+- `docs/issues/pending/0242-wire-or-delete-payments-escrow-factories.md`
+  (now depends on 0196 only; wiring is the default per ADR 0003)
+- `docs/issues/pending/0200-split-oracle-service-responsibilities.md`
+  (eviction direction references ADR 0003)
+
+Follow-up change issues for the migration (all pre-existing, now
+direction-locked): 0191 (facade migration — executes the decision), 0200
+(evicts role-neutral release semantics from `adapters/nostr/`), 0242 (escrow
+factory wiring, after 0196), 0239 (role types fold, after 0191).
+
+Verified with:
+
+- ADR 0003 and the architecture-doc sentence exist; 0191/0200/0242 carry the
+  locked direction (the issue's own verification is the recorded decision plus
+  follow-up issues).
+- `deno task test:all` on the closing branch.
+
+Harness update:
+
+- None — one-time `human universal decision` now locked in ADR 0003; drift
+  protection is owned by 0191's acceptance (no per-role status model remains)
+  and the existing arch-lint E026 importer whitelist, which 0191 shrinks as
+  production importers become real.
+
+Review residuals:
+
+- Until 0191 closes, production facades still run their own status models —
+  transitional state accepted by this decision, owned by 0191.
+
+Follow-up:
+
+- 0191, 0200, 0242, 0239 (existing pending issues own the migration work).

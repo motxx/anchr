@@ -48,7 +48,7 @@ export async function runQuickStart(
   const oracle = generateKeypair();
   const queryId = `quick-start-${identity.publicKey.slice(0, 12)}`;
 
-  const payload: QueryRequestPayload = {
+  const payload: Omit<QueryRequestPayload, "version"> = {
     query_id: queryId,
     schema: ProofSchema.TlsnV1,
     customer_pubkey: identity.publicKey,

@@ -10,7 +10,7 @@
 
 export type AttachmentStorageKind = "blossom" | "external";
 
-/** Verification labels are schema-internal strings carried opaquely. */
+/** Verification labels are opaque strings defined by the selected Proof Schema. */
 export const VERIFICATION_FACTORS = [] as const;
 export type VerificationFactor = string;
 

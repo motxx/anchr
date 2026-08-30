@@ -25,6 +25,8 @@ unless a section is explicitly marked for one agent.
   `scripts/arch-lint-llm-verify.ts`.
 - `check-silent-bypass` — semantic trust-boundary bypass review; backed by
   the pre-ship hook `scripts/silent-bypass-verify.ts`.
+- `plain-terms` — replace coined compound terms with established vocabulary
+  or a direct description of the subject, artifact, and behavior.
 
 ## Authoring rules
 

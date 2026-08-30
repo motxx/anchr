@@ -1,5 +1,5 @@
 import { createQueryAggregate } from "../domain/query-aggregate.ts";
-import { isCancellable, isExpirable } from "../domain/query-transitions.ts";
+import { isExpirable, isOpenStatus } from "../domain/query-transitions.ts";
 import type { QueryStore } from "../domain/query-store.ts";
 import type { BlossomKeyMap } from "../../values.ts";
 import type {
@@ -110,7 +110,7 @@ export function doCancelQuery(
 ): CancelQueryOutcome {
   const query = store.get(id);
   if (!query) return { ok: false, message: "Query not found" };
-  if (!isCancellable(query.status)) {
+  if (!isOpenStatus(query.status)) {
     return { ok: false, message: `Query is already ${query.status}` };
   }
   store.set(id, { ...query, status: "rejected", payment_status: "cancelled" });

@@ -8,6 +8,7 @@ import {
   toOracleAttestation,
 } from "./oracle-attestation.ts";
 import type { OracleAttestation } from "../../../requests/domain/oracle-types.ts";
+import { ORACLE_ATTESTATION_VERSION } from "./versions.ts";
 
 const oracleIdentity = generateEphemeralIdentity();
 
@@ -53,6 +54,7 @@ test("parseOracleAttestationPayload round-trips", () => {
   );
 
   const parsed = parseOracleAttestationPayload(event.content);
+  expect(parsed.version).toBe(ORACLE_ATTESTATION_VERSION);
   expect(parsed.oracle_id).toBe("test-oracle");
   expect(parsed.passed).toBe(true);
   expect(parsed.checks).toEqual([
@@ -65,6 +67,7 @@ test("parseOracleAttestationPayload round-trips", () => {
 test("toOracleAttestation converts payload", () => {
   const payload = parseOracleAttestationPayload(
     JSON.stringify({
+      version: ORACLE_ATTESTATION_VERSION,
       oracle_id: "o1",
       query_id: "q1",
       passed: false,
@@ -78,6 +81,22 @@ test("toOracleAttestation converts payload", () => {
   expect(att.oracle_id).toBe("o1");
   expect(att.passed).toBe(false);
   expect(att.failures).toEqual(["bad image"]);
+});
+
+test("parseOracleAttestationPayload rejects a missing or unsupported version", () => {
+  const base = {
+    oracle_id: "o1",
+    query_id: "q1",
+    passed: true,
+    checks: [],
+    failures: [],
+    attested_at: 999,
+  };
+
+  expect(() => parseOracleAttestationPayload(JSON.stringify(base))).toThrow();
+  expect(() =>
+    parseOracleAttestationPayload(JSON.stringify({ ...base, version: 1 }))
+  ).toThrow();
 });
 
 test("failed attestation sets result tag to fail", () => {

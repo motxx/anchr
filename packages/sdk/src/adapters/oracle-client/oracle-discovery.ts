@@ -21,6 +21,7 @@ import {
   requireNumber,
   requireString,
 } from "../../internal/runtime/types.ts";
+import { ORACLE_ANNOUNCEMENT_VERSION } from "../nostr/events/versions.ts";
 
 const PAYMENT_LOCK_TYPE_SET = new Set<string>(PAYMENT_LOCK_TYPE_VALUES);
 const RELAY_CLOSE_GRACE_MS = 250;
@@ -33,18 +34,25 @@ function isPaymentLockType(x: unknown): x is PaymentLockType {
   return typeof x === "string" && PAYMENT_LOCK_TYPE_SET.has(x);
 }
 
-function filterSchemaUris(value: unknown): SchemaUri[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isSchemaUri);
+function requireSchemaUris(value: unknown): SchemaUri[] {
+  if (!Array.isArray(value) || !value.every(isSchemaUri)) {
+    throw new TypeError("expected supported_schemas to contain HTTPS URLs");
+  }
+  return value;
 }
 
-function filterPaymentLockTypes(value: unknown): PaymentLockType[] {
-  if (!Array.isArray(value)) return [];
-  return value.filter(isPaymentLockType);
+function requirePaymentLockTypes(value: unknown): PaymentLockType[] {
+  if (!Array.isArray(value) || !value.every(isPaymentLockType)) {
+    throw new TypeError(
+      "expected supported_payment_lock_types to contain known values",
+    );
+  }
+  return value;
 }
 
 /** Parsed oracle announcement from a Nostr kind 30088 event. */
 export interface OracleAnnouncement {
+  version: typeof ORACLE_ANNOUNCEMENT_VERSION;
   id: string;
   name: string;
   endpoint?: string;
@@ -74,14 +82,16 @@ export function parseOracleAnnouncementEvent(
   try {
     const content: unknown = JSON.parse(event.content);
     if (!isRecord(content)) return null;
+    if (content.version !== ORACLE_ANNOUNCEMENT_VERSION) return null;
 
     return {
+      version: ORACLE_ANNOUNCEMENT_VERSION,
       id: dTag[1],
       name: requireString(content, "name"),
       endpoint: optionalString(content, "endpoint"),
       fee_ppm: requireNumber(content, "fee_ppm"),
-      supported_schemas: filterSchemaUris(content.supported_schemas),
-      supported_payment_lock_types: filterPaymentLockTypes(
+      supported_schemas: requireSchemaUris(content.supported_schemas),
+      supported_payment_lock_types: requirePaymentLockTypes(
         content.supported_payment_lock_types,
       ),
       min_amount_sats: optionalNumber(content, "min_amount_sats"),
@@ -99,12 +109,12 @@ export function parseOracleAnnouncementEvent(
  * Discover oracles by querying Nostr relays for kind 30088 events
  * tagged with `anchr-oracle`.
  *
- * Optionally filter by exact proof schema URL.
+ * Optionally filter by exact Proof Schema URL.
  */
 export async function discoverOracles(
   relayUrls: string[],
   options?: {
-    /** Filter by exact proof schema URL. */
+    /** Filter by exact Proof Schema URL. */
     schema?: SchemaUri;
     /** Only return announcements newer than this unix timestamp. */
     since?: number;

@@ -18,7 +18,7 @@ import type { SchemaUri } from "@anchr/protocol/schema";
 export interface VerificationRequirement {
   /** Stable identifier — used for integrity-store lookup keyed on the request. */
   id: string;
-  /** Proof schema URI that owns requirement, evidence, checks, and verdict. */
+  /** Proof Schema URL that defines the requirement, evidence, checks, and verdict. */
   schema?: SchemaUri;
   factors: readonly VerificationFactor[];
   /** Free-text description of what the proof must establish. */

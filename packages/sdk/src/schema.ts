@@ -85,7 +85,7 @@ function bundleToVerifierAdapter(bundle: SchemaBundle): VerifierAdapter | null {
 
 export function registerSchemaBundle(bundle: SchemaBundle): () => void {
   if (schemaBundles.has(bundle.uri)) {
-    throw new Error(`Schema bundle already registered: ${bundle.uri}`);
+    throw new Error(`Proof Schema bundle already registered: ${bundle.uri}`);
   }
   schemaBundles.set(bundle.uri, bundle);
   return () => {
