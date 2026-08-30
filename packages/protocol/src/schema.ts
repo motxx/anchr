@@ -1,26 +1,26 @@
 /**
- * Schema URL dispatch.
+ * Proof Schema URL dispatch.
  *
  * The SDK dispatches by HTTPS URL string only — predicate shape, proof
- * format, and verification rules live in each schema's document. Built-in
+ * format, and verification rules live in each Proof Schema document. Built-in
  * URLs:
  *   - https://anchr-spec.org/spec/proof/tlsn/v1 — TLSNotary attestation of an HTTPS response
  *   - https://anchr-spec.org/spec/proof/c2pa-image/v1 — C2PA image manifest with signed GPS binding
  */
 
-/** HTTPS proof schema URL form. The SDK validates shape and dispatches by URL. */
+/** HTTPS Proof Schema URL form. The SDK validates shape and dispatches by URL. */
 export type SchemaUri = string;
 
-/** Canonical proof schema URLs that this SDK version commits to as stable identifiers. */
+/** Canonical Proof Schema URLs provided by this SDK version. */
 export const ProofSchema = {
   TlsnV1: "https://anchr-spec.org/spec/proof/tlsn/v1",
   C2paImageV1: "https://anchr-spec.org/spec/proof/c2pa-image/v1",
 } as const;
 
-/** Type-level enumeration of canonical proof schema URLs. */
+/** Type-level enumeration of canonical Proof Schema URLs. */
 export type ProofSchema = typeof ProofSchema[keyof typeof ProofSchema];
 
-/** Returns true when the value is a syntactically plausible HTTPS proof schema URL. */
+/** Returns true when the value is a syntactically plausible HTTPS Proof Schema URL. */
 export function isSchemaUri(value: unknown): value is SchemaUri {
   if (typeof value !== "string") return false;
   let url: URL;
@@ -35,18 +35,18 @@ export function isSchemaUri(value: unknown): value is SchemaUri {
   return /^\/spec\/proof\/[a-z0-9-]+\/v\d+$/.test(url.pathname);
 }
 
-/** Thrown when a schema URL is required but not registered with the SDK. */
+/** Thrown when a Proof Schema URL is required but not registered with the SDK. */
 export class UnknownSchemaError extends Error {
   constructor(public readonly uri: SchemaUri) {
-    super(`Unknown schema URL: ${uri}`);
+    super(`Unknown Proof Schema URL: ${uri}`);
     this.name = "UnknownSchemaError";
   }
 }
 
-/** Thrown when a schema URL fails the syntactic shape check. */
+/** Thrown when a Proof Schema URL fails the syntactic shape check. */
 export class InvalidSchemaUriError extends Error {
   constructor(public readonly value: unknown) {
-    super(`Invalid schema URL: ${String(value)}`);
+    super(`Invalid Proof Schema URL: ${String(value)}`);
     this.name = "InvalidSchemaUriError";
   }
 }

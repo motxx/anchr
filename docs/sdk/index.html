@@ -1223,7 +1223,7 @@
           <pre><code>{{ quickStartCode }}</code></pre>
         </div>
 
-        <h3>Wire up an actor</h3>
+        <h3>Set up an actor</h3>
         <p class="small-copy">The same primitives compose the full Customer / Provider / Oracle exchange. Pick a role:</p>
 
         <div class="tabbar" role="tablist" aria-label="Quick start role examples">
@@ -1291,7 +1291,7 @@
           </sc-for>
         </div>
 
-        <p class="small-copy">Verifier helpers are exported from <code>@anchr/sdk/proofs</code>. Applications can publish their own HTTPS schema URLs for proof formats outside the built-in set; wire your own <code>produce()</code> in the Provider handler to match.</p>
+        <p class="small-copy">Verifier helpers are exported from <code>@anchr/sdk/proofs</code>. Applications can publish their own Proof Schema URLs for proof formats outside the built-in set; provide a matching <code>produce()</code> implementation in the Provider handler.</p>
       </section>
 
       <section id="trust" class="doc-section">
@@ -1494,14 +1494,14 @@ class Component extends DCLogic {
         { a: "@anchr/sdk", b: "main", c: "Customer, Provider, Oracle, payment, proof, attachment, and adapter APIs." },
         { a: "@anchr/sdk/proofs", b: "proof helpers", c: "TLSNotary and C2PA verifier helpers." },
         { a: "@anchr/sdk/testing", b: "test fakes", c: "In-memory Cashu and relay fakes for unit tests." },
-        { a: "@anchr/protocol", b: "wire contract", c: "Nostr wire events, settlement fields, schema identifiers, and validators." },
+        { a: "@anchr/protocol", b: "protocol API", c: "Nostr events, settlement fields, Proof Schema identifiers, and validators." },
       ],
     },
   ];
 
   footerLinks = [
     { label: "Repository", href: "https://github.com/motxx/anchr" },
-    { label: "Wire spec", href: "https://github.com/motxx/anchr/tree/main/specs" },
+    { label: "Protocol format specification", href: "https://github.com/motxx/anchr/tree/main/specs" },
     { label: "Threat model", href: "https://github.com/motxx/anchr/blob/main/docs/threat-model.md" },
   ];
 
@@ -1572,8 +1572,8 @@ await provider.serve(async (request) => {
   return {
     amountSats: 100,
     produce: async () => ({
-      data: { /* schema-specific payload */ },
-      proof: "schema-specific-proof",
+      data: { /* payload defined by the Proof Schema */ },
+      proof: "proof-placeholder",
     }),
   };
 });`,
@@ -1625,8 +1625,8 @@ const customer = createCustomer({
   return {
     amountSats: 100,
     produce: async () => ({
-      data: { /* schema-specific payload */ },
-      proof: "schema-specific-proof",
+      data: { /* payload defined by the Proof Schema */ },
+      proof: "proof-placeholder",
     }),
   };
 });

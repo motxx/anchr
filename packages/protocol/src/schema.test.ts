@@ -8,7 +8,7 @@ import {
   UnknownSchemaError,
 } from "./schema.ts";
 
-test("ProofSchema exposes the v0.0.1 proof schema URLs", () => {
+test("ProofSchema exposes the v0.0.1 Proof Schema URLs", () => {
   expect(ProofSchema.TlsnV1).toBe(
     "https://anchr-spec.org/spec/proof/tlsn/v1",
   );
@@ -22,7 +22,7 @@ test("isSchemaUri accepts the defined schemas", () => {
   expect(isSchemaUri(ProofSchema.C2paImageV1)).toBe(true);
 });
 
-test("isSchemaUri accepts third-party HTTPS proof schema URLs", () => {
+test("isSchemaUri accepts third-party HTTPS Proof Schema URLs", () => {
   expect(isSchemaUri("https://example.com/spec/proof/custom-proof/v1")).toBe(
     true,
   );

@@ -2,8 +2,8 @@
  * Anchr event payload builders / parsers.
  *
  * The SDK uses NIP-90 DVM kinds (5300 / 6300 / 7000) but defines its
- * own payload shape inside the event content. This module isolates the
- * wire format so Customer / Provider both reference the same builders.
+ * own payload format inside the event content. This module keeps those JSON
+ * formats in one place so Customer / Provider both reference the same builders.
  */
 
 import {
@@ -19,15 +19,42 @@ import {
   signEvent,
 } from "./nostr.ts";
 
+/** Versions of the independent Anchr JSON formats defined by this module. */
+export const QUERY_REQUEST_VERSION = 0 as const;
+export const OFFER_FEEDBACK_VERSION = 0 as const;
+export const SELECTION_FEEDBACK_VERSION = 0 as const;
+export const QUERY_RESPONSE_VERSION = 0 as const;
+export const ORACLE_QUERY_RESPONSE_VERSION = 0 as const;
+export const PREIMAGE_DELIVERY_VERSION = 0 as const;
+export const HASH_REQUEST_VERSION = 0 as const;
+export const HASH_RESPONSE_VERSION = 0 as const;
+
+/** Field shared by the Anchr JSON formats defined by this module. */
+export interface VersionedPayload<Version extends number> {
+  version: Version;
+}
+
+function stringifyPayload(payload: object, version: number): string {
+  return JSON.stringify({ ...payload, version });
+}
+
+function hasVersion(
+  payload: Record<string, unknown>,
+  version: number,
+): boolean {
+  return payload.version === version;
+}
+
 /**
  * Request Notice published in the content of a kind 5300 Job Request event.
  * Provider-specific execution and payment material is delivered after Provider
  * Selection.
  */
-export interface QueryRequestPayload {
+export interface QueryRequestPayload
+  extends VersionedPayload<typeof QUERY_REQUEST_VERSION> {
   /** Caller-chosen unique query id (SHOULD match the `d` tag). */
   query_id: string;
-  /** Schema URL identifying the proof format. */
+  /** Proof Schema URL identifying the proof format. */
   schema: string;
   /** Hex pubkey of the customer (ephemeral; refund recipient). */
   customer_pubkey: string;
@@ -41,9 +68,9 @@ export interface QueryRequestPayload {
 
 /** Provider-only execution and payment context delivered after selection. */
 export interface SelectionExecutionPayload {
-  /** Schema URL identifying the proof format. */
+  /** Proof Schema URL identifying the proof format. */
   schema: string;
-  /** Schema-specific predicate interpreted by the selected Provider. */
+  /** Predicate defined by the selected Proof Schema and interpreted by the Provider. */
   predicate: unknown;
   /** Optional human-readable description of intent. */
   description?: string;
@@ -60,33 +87,20 @@ export interface SelectionExecutionPayload {
 }
 
 /**
- * Wire-contract major version carried in the `v` tag of the four protocol
- * event kinds. Absence of the tag is read as version 0; an event carrying a
- * different `v` value speaks an incompatible future contract and MUST be
- * ignored by v0 parsers.
- */
-export const WIRE_VERSION = "0";
-
-function hasIncompatibleWireVersion(event: Event): boolean {
-  const tag = event.tags.find((t) => t[0] === "v" && t[1] !== undefined);
-  return tag !== undefined && tag[1] !== WIRE_VERSION;
-}
-
-/**
  * Build a signed kind 5300 Job Request event for the given payload.
  *
  * Tag layout:
  *   - d:        query_id (NIP-33 addressable)
  *   - t:        "anchr" (discovery tag)
  *   - p:        oracle pubkey (NIP-90 marker "oracle")
- *   - s:        proof schema URL (custom tag, indexable as #s)
+ *   - s:        Proof Schema URL (custom tag, indexable as #s)
  *   - region:   optional uppercase region code (indexable as #region)
  *
  * The content carries only the Request Notice payload above.
  */
 export function buildQueryRequestEvent(
   identity: Keypair,
-  payload: QueryRequestPayload,
+  payload: Omit<QueryRequestPayload, "version">,
   options?: { regionCode?: string },
 ): Event {
   const tags: string[][] = [
@@ -94,7 +108,6 @@ export function buildQueryRequestEvent(
     ["t", "anchr"],
     ["p", payload.oracle_pubkey, "", "oracle"],
     ["s", payload.schema],
-    ["v", WIRE_VERSION],
   ];
   if (options?.regionCode !== undefined && options.regionCode.length > 0) {
     tags.push(["region", options.regionCode.toUpperCase()]);
@@ -104,7 +117,7 @@ export function buildQueryRequestEvent(
     {
       kind: KIND_QUERY_REQUEST,
       created_at: Math.floor(Date.now() / 1000),
-      content: JSON.stringify(payload),
+      content: stringifyPayload(payload, QUERY_REQUEST_VERSION),
       tags,
     },
     identity.secretKey,
@@ -123,7 +136,6 @@ export function parseQueryRequestEvent(
   event: Event,
 ): QueryRequestPayload | null {
   if (event.kind !== KIND_QUERY_REQUEST) return null;
-  if (hasIncompatibleWireVersion(event)) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(event.content);
@@ -132,6 +144,7 @@ export function parseQueryRequestEvent(
   }
   if (typeof parsed !== "object" || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
+  if (!hasVersion(p, QUERY_REQUEST_VERSION)) return null;
   if (
     "predicate" in p ||
     "context" in p ||
@@ -155,6 +168,7 @@ export function parseQueryRequestEvent(
     return null;
   }
   return {
+    version: QUERY_REQUEST_VERSION,
     query_id: p.query_id,
     schema: p.schema,
     customer_pubkey: p.customer_pubkey,
@@ -165,7 +179,8 @@ export function parseQueryRequestEvent(
 }
 
 /** Plaintext payload published by a provider offering on a request (NIP-90 kind 7000, status=payment-required). */
-export interface OfferFeedbackPayload {
+export interface OfferFeedbackPayload
+  extends VersionedPayload<typeof OFFER_FEEDBACK_VERSION> {
   status: "payment-required";
   /** Provider's hex pubkey (must match the event's pubkey). */
   provider_pubkey: string;
@@ -186,19 +201,18 @@ export function buildOfferFeedbackEvent(
   identity: Keypair,
   requestEventId: string,
   customerPubkey: string,
-  payload: OfferFeedbackPayload,
+  payload: Omit<OfferFeedbackPayload, "version">,
 ): Event {
   const tags: string[][] = [
     ["e", requestEventId, "", "request"],
     ["p", customerPubkey],
     ["status", payload.status],
-    ["v", WIRE_VERSION],
   ];
   return signEvent(
     {
       kind: KIND_QUERY_FEEDBACK,
       created_at: Math.floor(Date.now() / 1000),
-      content: JSON.stringify(payload),
+      content: stringifyPayload(payload, OFFER_FEEDBACK_VERSION),
       tags,
     },
     identity.secretKey,
@@ -214,7 +228,6 @@ export function parseOfferFeedbackEvent(
   event: Event,
 ): ParsedOfferFeedback | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
-  if (hasIncompatibleWireVersion(event)) return null;
   let parsed: unknown;
   try {
     parsed = JSON.parse(event.content);
@@ -224,6 +237,7 @@ export function parseOfferFeedbackEvent(
   if (typeof parsed !== "object" || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
   if (
+    !hasVersion(p, OFFER_FEEDBACK_VERSION) ||
     p.status !== "payment-required" ||
     typeof p.provider_pubkey !== "string" ||
     typeof p.amount_sats !== "number"
@@ -237,6 +251,7 @@ export function parseOfferFeedbackEvent(
     return null;
   }
   return {
+    version: OFFER_FEEDBACK_VERSION,
     status: "payment-required",
     provider_pubkey: p.provider_pubkey,
     amount_sats: p.amount_sats,
@@ -246,7 +261,8 @@ export function parseOfferFeedbackEvent(
 }
 
 /** Provider-only payload encrypted by a customer after selecting a provider. */
-export interface SelectionFeedbackPayload {
+export interface SelectionFeedbackPayload
+  extends VersionedPayload<typeof SELECTION_FEEDBACK_VERSION> {
   status: "processing";
   /** Hex pubkey of the selected provider. */
   selected_provider_pubkey: string;
@@ -260,10 +276,10 @@ export interface SelectionFeedbackPayload {
 export function buildSelectionFeedbackEvent(
   identity: Keypair,
   requestEventId: string,
-  payload: SelectionFeedbackPayload,
+  payload: Omit<SelectionFeedbackPayload, "version">,
 ): Event {
   const ciphertext = encryptNip44(
-    JSON.stringify(payload),
+    stringifyPayload(payload, SELECTION_FEEDBACK_VERSION),
     identity.secretKey,
     payload.selected_provider_pubkey,
   );
@@ -271,7 +287,6 @@ export function buildSelectionFeedbackEvent(
     ["e", requestEventId, "", "request"],
     ["p", payload.selected_provider_pubkey],
     ["status", payload.status],
-    ["v", WIRE_VERSION],
   ];
   return signEvent(
     {
@@ -291,7 +306,6 @@ export function parseSelectionFeedbackEvent(
   senderPubkey: string,
 ): SelectionFeedbackPayload | null {
   if (event.kind !== KIND_QUERY_FEEDBACK) return null;
-  if (hasIncompatibleWireVersion(event)) return null;
   let plaintext: string;
   try {
     plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
@@ -307,6 +321,7 @@ export function parseSelectionFeedbackEvent(
   if (typeof parsed !== "object" || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
   if (
+    !hasVersion(p, SELECTION_FEEDBACK_VERSION) ||
     p.status !== "processing" ||
     typeof p.selected_provider_pubkey !== "string" ||
     typeof p.provider_redemption_token !== "string" ||
@@ -328,6 +343,7 @@ export function parseSelectionFeedbackEvent(
   }
   if (findTagValue(event, "p") !== p.selected_provider_pubkey) return null;
   return {
+    version: SELECTION_FEEDBACK_VERSION,
     status: "processing",
     selected_provider_pubkey: p.selected_provider_pubkey,
     provider_redemption_token: p.provider_redemption_token,
@@ -350,17 +366,25 @@ export function parseSelectionFeedbackEvent(
 }
 
 /** Plaintext payload that travels NIP-44-encrypted in the NIP-90 kind 6300 result content. */
-export interface QueryResponsePayload {
-  /** Schema URL under which the proof was produced. */
+export interface QueryResponsePayload
+  extends VersionedPayload<typeof QUERY_RESPONSE_VERSION> {
+  /** Proof Schema URL under which the proof was produced. */
   schema: string;
-  /** Verified response payload (shape defined by the schema). */
+  /** Verified response payload (format defined by the schema). */
   data: unknown;
-  /** Proof bytes (format defined by the schema). Encoded as base64 or hex by the schema. */
-  proof: Uint8Array | string;
+  /** Proof evidence encoded as specified by the Proof Schema. */
+  proof: string;
 }
 
 /** Oracle-readable copy of a provider result, encrypted in a tag. */
-export interface OracleQueryResponsePayload extends QueryResponsePayload {
+export interface OracleQueryResponsePayload
+  extends VersionedPayload<typeof ORACLE_QUERY_RESPONSE_VERSION> {
+  /** Proof Schema URL under which the proof was produced. */
+  schema: string;
+  /** Response payload whose format is defined by the schema. */
+  data: unknown;
+  /** Proof evidence encoded as specified by the schema. */
+  proof: string;
   /** Matches the request payload's query_id. */
   query_id: string;
   /** Original kind 5300 request event id this result answers. */
@@ -380,7 +404,9 @@ export function buildQueryResponseEvent(
   identity: Keypair,
   requestEventId: string,
   customerPubkey: string,
-  payload: QueryResponsePayload,
+  payload: Omit<QueryResponsePayload, "version" | "proof"> & {
+    proof: Uint8Array | string;
+  },
   oraclePubkey?: string,
   queryId?: string,
 ): Event {
@@ -388,6 +414,7 @@ export function buildQueryResponseEvent(
     ? base64Encode(payload.proof)
     : payload.proof;
   const responseBody = {
+    version: QUERY_RESPONSE_VERSION,
     schema: payload.schema,
     data: payload.data,
     proof: proofForJson,
@@ -401,11 +428,13 @@ export function buildQueryResponseEvent(
   const tags: string[][] = [
     ["e", requestEventId, "", "request"],
     ["p", customerPubkey],
-    ["v", WIRE_VERSION],
   ];
   if (oraclePubkey !== undefined) {
     const oraclePlaintext = JSON.stringify({
-      ...responseBody,
+      version: ORACLE_QUERY_RESPONSE_VERSION,
+      schema: payload.schema,
+      data: payload.data,
+      proof: proofForJson,
       query_id: queryId ?? requestEventId,
       request_event_id: requestEventId,
     });
@@ -428,7 +457,7 @@ export function buildQueryResponseEvent(
 
 /**
  * Decrypt + parse a kind 6300 result event. Returns null if decryption
- * fails (event was not encrypted to us) or the payload shape is wrong.
+ * fails (event was not encrypted to us) or the payload format is invalid.
  */
 export function parseQueryResponseEvent(
   event: Event,
@@ -436,7 +465,6 @@ export function parseQueryResponseEvent(
   senderPubkey: string,
 ): QueryResponsePayload | null {
   if (event.kind !== KIND_QUERY_RESPONSE) return null;
-  if (hasIncompatibleWireVersion(event)) return null;
   let plaintext: string;
   try {
     plaintext = decryptNip44(event.content, recipientSecretKey, senderPubkey);
@@ -452,6 +480,7 @@ export function parseQueryResponseEvent(
   if (typeof parsed !== "object" || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
   if (
+    !hasVersion(p, QUERY_RESPONSE_VERSION) ||
     typeof p.schema !== "string" ||
     !("data" in p) ||
     typeof p.proof !== "string"
@@ -459,6 +488,7 @@ export function parseQueryResponseEvent(
     return null;
   }
   return {
+    version: QUERY_RESPONSE_VERSION,
     schema: p.schema,
     data: p.data,
     proof: p.proof,
@@ -476,7 +506,6 @@ export function parseOracleQueryResponseEvent(
   providerPubkey: string,
 ): OracleQueryResponsePayload | null {
   if (event.kind !== KIND_QUERY_RESPONSE) return null;
-  if (hasIncompatibleWireVersion(event)) return null;
   const tag = event.tags.find((t) => t[0] === "oracle_payload" && t[1]);
   if (!tag?.[1]) return null;
 
@@ -496,6 +525,7 @@ export function parseOracleQueryResponseEvent(
   if (typeof parsed !== "object" || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
   if (
+    !hasVersion(p, ORACLE_QUERY_RESPONSE_VERSION) ||
     typeof p.schema !== "string" ||
     typeof p.query_id !== "string" ||
     typeof p.request_event_id !== "string" ||
@@ -505,6 +535,7 @@ export function parseOracleQueryResponseEvent(
     return null;
   }
   return {
+    version: ORACLE_QUERY_RESPONSE_VERSION,
     schema: p.schema,
     query_id: p.query_id,
     request_event_id: p.request_event_id,
@@ -520,7 +551,8 @@ function base64Encode(bytes: Uint8Array): string {
 }
 
 /** Plaintext payload that travels NIP-44-encrypted in the NIP-04 kind 4 DM content. */
-export interface PreimageDeliveryPayload {
+export interface PreimageDeliveryPayload
+  extends VersionedPayload<typeof PREIMAGE_DELIVERY_VERSION> {
   /** Matches the request's query_id (anti-replay). */
   query_id: string;
   /** Original kind 5300 event id this preimage is for. */
@@ -536,10 +568,10 @@ export interface PreimageDeliveryPayload {
 export function buildPreimageDeliveryEvent(
   identity: Keypair,
   recipientPubkey: string,
-  payload: PreimageDeliveryPayload,
+  payload: Omit<PreimageDeliveryPayload, "version">,
 ): Event {
   const ciphertext = encryptNip44(
-    JSON.stringify(payload),
+    stringifyPayload(payload, PREIMAGE_DELIVERY_VERSION),
     identity.secretKey,
     recipientPubkey,
   );
@@ -557,7 +589,7 @@ export function buildPreimageDeliveryEvent(
 
 /**
  * Decrypt + parse a kind 4 NIP-44 DM expected to carry a preimage.
- * Returns null if decryption fails (DM not for us) or shape is wrong.
+ * Returns null if decryption fails (DM not for us) or the payload is invalid.
  */
 export function parsePreimageDeliveryEvent(
   event: Event,
@@ -580,6 +612,7 @@ export function parsePreimageDeliveryEvent(
   if (typeof parsed !== "object" || parsed === null) return null;
   const p = parsed as Record<string, unknown>;
   if (
+    !hasVersion(p, PREIMAGE_DELIVERY_VERSION) ||
     typeof p.query_id !== "string" ||
     typeof p.request_event_id !== "string" ||
     typeof p.preimage !== "string"
@@ -587,6 +620,7 @@ export function parsePreimageDeliveryEvent(
     return null;
   }
   return {
+    version: PREIMAGE_DELIVERY_VERSION,
     query_id: p.query_id,
     request_event_id: p.request_event_id,
     preimage: p.preimage,
@@ -594,14 +628,16 @@ export function parsePreimageDeliveryEvent(
 }
 
 /** Customer→Oracle hash bootstrap request (NIP-44 kind 4 DM content). */
-export interface HashRequestPayload {
+export interface HashRequestPayload
+  extends VersionedPayload<typeof HASH_REQUEST_VERSION> {
   type: "hash_request";
   /** Caller-chosen unique query id the hash commitment is bound to. */
   query_id: string;
 }
 
 /** Oracle→Customer hash bootstrap response (NIP-44 kind 4 DM content). */
-export interface HashResponsePayload {
+export interface HashResponsePayload
+  extends VersionedPayload<typeof HASH_RESPONSE_VERSION> {
   type: "hash_response";
   /** Matches the request's query_id. */
   query_id: string;
@@ -617,10 +653,10 @@ export interface HashResponsePayload {
 export function buildHashRequestEvent(
   identity: Keypair,
   oraclePubkey: string,
-  payload: HashRequestPayload,
+  payload: Omit<HashRequestPayload, "version">,
 ): Event {
   const ciphertext = encryptNip44(
-    JSON.stringify(payload),
+    stringifyPayload(payload, HASH_REQUEST_VERSION),
     identity.secretKey,
     oraclePubkey,
   );
@@ -646,20 +682,28 @@ export function parseHashRequestEvent(
 ): HashRequestPayload | null {
   const p = decryptDmJson(event, recipientSecretKey, senderPubkey);
   if (p === null) return null;
-  if (p.type !== "hash_request" || typeof p.query_id !== "string") {
+  if (
+    !hasVersion(p, HASH_REQUEST_VERSION) ||
+    p.type !== "hash_request" ||
+    typeof p.query_id !== "string"
+  ) {
     return null;
   }
-  return { type: "hash_request", query_id: p.query_id };
+  return {
+    version: HASH_REQUEST_VERSION,
+    type: "hash_request",
+    query_id: p.query_id,
+  };
 }
 
 /** Build a signed kind 4 NIP-44 DM answering a hash bootstrap request. */
 export function buildHashResponseEvent(
   identity: Keypair,
   recipientPubkey: string,
-  payload: HashResponsePayload,
+  payload: Omit<HashResponsePayload, "version">,
 ): Event {
   const ciphertext = encryptNip44(
-    JSON.stringify(payload),
+    stringifyPayload(payload, HASH_RESPONSE_VERSION),
     identity.secretKey,
     recipientPubkey,
   );
@@ -686,13 +730,19 @@ export function parseHashResponseEvent(
   const p = decryptDmJson(event, recipientSecretKey, senderPubkey);
   if (p === null) return null;
   if (
+    !hasVersion(p, HASH_RESPONSE_VERSION) ||
     p.type !== "hash_response" ||
     typeof p.query_id !== "string" ||
     typeof p.hash !== "string"
   ) {
     return null;
   }
-  return { type: "hash_response", query_id: p.query_id, hash: p.hash };
+  return {
+    version: HASH_RESPONSE_VERSION,
+    type: "hash_response",
+    query_id: p.query_id,
+    hash: p.hash,
+  };
 }
 
 function decryptDmJson(
