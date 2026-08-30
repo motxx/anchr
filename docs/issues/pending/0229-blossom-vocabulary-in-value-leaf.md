@@ -25,7 +25,7 @@ interface leaks the backend the same way (error copy naming Blossom, hardcoded
 `storage_kind: "blossom"`, `UploadResult.encryption` typed as
 `BlossomKeyMaterial`). ADR 0001 fixes the v0 substrates to Nostr and Cashu;
 whether Blossom is similarly a fixed v0 attachment substrate (making these
-names contract vocabulary) or an implementation detail behind a neutral shape
+names shared protocol vocabulary) or an implementation detail behind a neutral shape
 is undecided. Decide once and make the value objects and upload surface
 conform.
 
@@ -39,7 +39,7 @@ conform.
   Set BLOSSOM_SERVERS…"), `:26` (`UploadResult.encryption: BlossomKeyMaterial`),
   `:128` (`storage_kind: "blossom"`), `:131-133`.
 - `docs/architecture.md` ("Surface Policy") keeps Blossom under the SDK
-  attachment surface but does not state whether the wire-facing
+  attachment API but does not state whether the protocol message
   `AttachmentRef` shape is Blossom-fixed; `AttachmentStorageKind` implies
   multiple kinds while only one exists.
 

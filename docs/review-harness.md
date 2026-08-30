@@ -40,6 +40,7 @@ from ad hoc review into one of these homes.
 | `deno task test:all:docker` | `automated` | Docker-backed verification bar from `CLAUDE.md`. |
 | `skills/arch-lint-llm/SKILL.md` | `semantic skill` | God modules, hidden service locators, duplicated state machines, inappropriate intimacy, oversized functions, and domain leakage that deterministic architecture lint cannot prove. |
 | `skills/check-silent-bypass/SKILL.md` | `semantic skill` | Plausible-looking branches that skip verification, validation, settlement, redemption, auth, signing, or quorum checks. |
+| `skills/plain-terms/SKILL.md` | `semantic skill` | Coined compound terms that hide the concrete subject, artifact, or behavior. |
 | `skills/resolve-issues/SKILL.md` | `semantic skill` | Issue closure discipline: dependency checks, resolver-led splitting, focused implementation, verification, resolution notes, and moving issues only after checks pass. |
 | `skills/make-issues/SKILL.md` | `semantic skill` | Converting review findings and TODOs into repository-tracked pending issues without overfitting the implementation split, and creating resolver-led child issues with parent/child dependency links when one issue is too broad for a coherent verified change. |
 | `deno task smoke` from a Testnet example directory | `automated` | The example's local compile/API-drift smoke check before maintainers advertise or keep a README status of `Testnet`. |
@@ -91,7 +92,7 @@ the runbook must state which live dependencies remain outside the smoke check.
 | Missing behavior coverage in package code | `automated` | `deno task test:unit` or `deno task test:integration` | Add the narrowest test at the owning package boundary. |
 | Cross-actor protocol regression | `automated` | `deno task test:e2e:protocol` | Add an e2e test with a protocol-level name. |
 | Infrastructure-specific regression | `automated` | Relay, regtest, FROST, or TLSN e2e bucket | Add coverage to the bucket matching the infrastructure profile. |
-| Concrete technology leaking into a universal contract | `human universal decision` | `docs/universality-boundaries.md`, `docs/architecture.md`, `specs/` | Decide whether the rule is universal or adapter-specific before coding. |
+| Concrete technology leaking into a shared protocol requirement | `human universal decision` | `docs/universality-boundaries.md`, `docs/architecture.md`, `specs/` | Decide whether compatible implementations must share the rule or it is adapter-specific before coding. |
 | Example or product policy leaking into packages | `automated` and `human universal decision` | `deno task lint:arch`, `docs/universality-boundaries.md` | Add vocabulary or dependency lint only when the leak can be detected mechanically. |
 | Public vocabulary change | `human universal decision` | `docs/architecture.md`, `specs/`, owning package docs | Record the vocabulary decision before broad renames. |
 | Pre-1.0 replaced path kept as a compatibility shim | `automated` | `deno task lint:deprecation` plus tests for new behavior | Delete the path and lock the replacement behavior. |
@@ -174,7 +175,7 @@ class higher in the table.
 
 | Class | Definition | Default home |
 | --- | --- | --- |
-| `bug regression` | A previously-working behavior or contract no longer holds. The fix is a concrete code change with an observable failure mode. | Add the narrowest failing test next to the code (unit, integration, or e2e bucket matching the infrastructure profile), then fix the code. |
+| `bug regression` | A previously-working behavior or API no longer works. The fix is a concrete code change with an observable failure mode. | Add the narrowest failing test next to the code (unit, integration, or e2e bucket matching the infrastructure profile), then fix the code. |
 | `boundary drift` | A layer, package, vocabulary, dependency-direction, or runtime-placement rule is violated. The shape of the violation is structural, not semantic. | Extend `scripts/arch-lint.ts` (or another `scripts/lint-*.ts`) plus its test fixture. Use `skills/arch-lint-llm/SKILL.md` only when the rule cannot be expressed deterministically. |
 | `semantic bypass` | A plausible-looking branch skips a verification, validation, settlement, redemption, auth, signing, or quorum check. The pattern requires reading intent across files. | Add the concrete shape to `skills/check-silent-bypass/SKILL.md`. Add a deterministic lint or test if the pattern can be reduced to a syntactic check. |
 | `missing invariant` | A security, fund-flow, oracle-release, privacy, or replay property is implicit and not locked. Weakening it would invalidate a `README.md` or threat-model claim. | Add or update an invariant in `docs/threat-model.md`, record it in `docs/threat-model.lock.json` via `deno task lint:invariants`, and reference the pinning test or attack class. |

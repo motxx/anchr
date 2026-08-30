@@ -1,5 +1,5 @@
 /**
- * Verifier core: resolve the registered schema bundle for a requirement,
+ * Verifier core: resolve the registered Proof Schema bundle for a requirement,
  * run its checks over the evidence, and aggregate the verdict.
  *
  * The host orchestrator is responsible for the *trust envelope* around this
@@ -37,11 +37,18 @@ export async function verifyProof(
     return {
       passed: false,
       checks: [],
-      failures: [`Unknown schema URL: ${schema}`],
+      failures: [`Unknown Proof Schema URL: ${schema}`],
     };
   }
 
   const checks = bundle.checks ?? [];
+  if (checks.length === 0) {
+    return {
+      passed: false,
+      checks: [],
+      failures: [`Proof Schema has no verification checks: ${schema}`],
+    };
+  }
   const acc: CheckAccumulator = { checks: [], failures: [], warnings: [] };
   const ctx: FactorCheckContext = {
     requirement,
