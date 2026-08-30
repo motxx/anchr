@@ -289,7 +289,6 @@ describe("TLSNotary E2E", () => {
       description: "E2E: Verify BTC/JPY price",
       schema: ProofSchema.TlsnV1,
       verification_requirements: ["tlsn"],
-      visibility: "customer_only",
       schema_requirement: {
         target_url: TARGET_URL,
         conditions: [{
@@ -353,7 +352,6 @@ describe("TLSNotary E2E", () => {
       schema: ProofSchema.TlsnV1,
       verification_requirements: ["tlsn"],
       schema_requirement: { target_url: "https://example.com" },
-      visibility: "customer_only",
     }, { ttlSeconds: 120, oracleIds: [TLSN_E2E_ORACLE_ID] });
 
     const outcome = await svc.submitQueryResult(
@@ -387,7 +385,6 @@ describe("TLSNotary E2E", () => {
           description: "E2E: extension result test",
           schema: ProofSchema.TlsnV1,
           verification_requirements: ["tlsn"],
-          visibility: "customer_only",
           schema_requirement: {
             target_url: TARGET_URL,
             conditions: [{
@@ -437,7 +434,6 @@ describe("TLSNotary E2E", () => {
         description: "E2E: HTTP API test",
         schema: ProofSchema.TlsnV1,
         verification_requirements: ["tlsn"],
-        visibility: "customer_only",
         schema_requirement: {
           target_url: TARGET_URL,
           conditions: [{

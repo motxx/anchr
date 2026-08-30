@@ -61,8 +61,8 @@ function parseAttachment(value: unknown): AttachmentRef | null {
 
 /**
  * Map the canonical Oracle-readable result payload onto the evidence shape
- * the verifier consumes. `data` carries schema-owned evidence fields plus
- * shared attachment references.
+ * the verifier consumes. `data` carries evidence fields defined by the Proof
+ * Schema plus shared attachment references.
  * Malformed fields are dropped, so verification fails closed on whatever
  * evidence the requirement demands but the payload does not carry.
  */

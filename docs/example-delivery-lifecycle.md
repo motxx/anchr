@@ -2,7 +2,7 @@
 
 This document defines the repeatable path for taking an `examples/<name>/`
 surface from an idea to a README-listed repository entry. It is repository
-policy, not a protocol contract.
+policy, not a protocol specification.
 
 Use it when creating or resolving issues that add, promote, demote, or retire an
 example.

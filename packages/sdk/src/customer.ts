@@ -351,7 +351,7 @@ export function createCustomer(options: CustomerOptions): Customer {
 
       const relayClient: RelayClient = options.relayClient;
 
-      const requestPayload: QueryRequestPayload = {
+      const requestPayload: Omit<QueryRequestPayload, "version"> = {
         query_id: queryId,
         schema: req.spec.schema,
         customer_pubkey: identity.publicKey,
@@ -453,7 +453,7 @@ export function createCustomer(options: CustomerOptions): Customer {
           await req.onPaymentChange?.(paymentChangeProofs);
         }
 
-        const selectionPayload: SelectionFeedbackPayload = {
+        const selectionPayload: Omit<SelectionFeedbackPayload, "version"> = {
           status: "processing",
           selected_provider_pubkey: selected.providerPubkey,
           provider_redemption_token: boundLock.token,

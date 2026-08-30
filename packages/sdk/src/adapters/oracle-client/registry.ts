@@ -1,4 +1,4 @@
-import type { Oracle, OracleInfo } from "../../requests/domain/oracle-types.ts";
+import type { Oracle } from "../../requests/domain/oracle-types.ts";
 import type { OracleRegistry } from "../../requests/application/ports.ts";
 export type { OracleRegistry } from "../../requests/application/ports.ts";
 
@@ -44,25 +44,4 @@ export function createOracleRegistry(): OracleRegistry {
   };
 
   return registry;
-}
-
-const defaultRegistry = createOracleRegistry();
-
-export function getOracle(id: string): Oracle | null {
-  return defaultRegistry.get(id);
-}
-
-export function listOracles(): OracleInfo[] {
-  return defaultRegistry.list();
-}
-
-export function registerOracle(oracle: Oracle): void {
-  defaultRegistry.register(oracle);
-}
-
-export function resolveOracle(
-  oracleId: string | undefined,
-  acceptableIds: string[] | undefined,
-): Oracle | null {
-  return defaultRegistry.resolve(oracleId, acceptableIds);
 }
