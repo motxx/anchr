@@ -49,13 +49,13 @@ export interface GpsCoord {
   lon: number;
 }
 
-/** Requirement payload for the built-in C2PA image schema. */
+/** Requirement payload for the built-in C2PA image Proof Schema. */
 export interface C2paImageRequirement {
   expected_gps?: GpsCoord;
   max_gps_distance_km?: number;
 }
 
-/** Evidence payload for the built-in C2PA image schema. */
+/** Evidence payload for the built-in C2PA image Proof Schema. */
 export interface C2paImageEvidence {
   gps?: GpsCoord;
 }

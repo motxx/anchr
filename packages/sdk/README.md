@@ -134,8 +134,8 @@ await provider.serve(async (request) => {
   return {
     amountSats: 100,
     produce: async () => ({
-      data: {/* schema-specific payload */},
-      proof: "schema-specific-proof-placeholder",
+      data: {/* payload defined by the Proof Schema */},
+      proof: "proof-placeholder",
     }),
   };
 });
@@ -156,7 +156,7 @@ the SDK ships as constants:
 | `https://anchr-spec.org/spec/proof/tlsn/v1`       | TLSNotary attestation of an HTTPS response  |
 | `https://anchr-spec.org/spec/proof/c2pa-image/v1` | C2PA image manifest with signed GPS binding |
 
-Wire your own `produce(): Promise<{ data, proof }>` in the provider handler.
+Provide your own `produce(): Promise<{ data, proof }>` in the Provider handler.
 TLSNotary and C2PA verifier helpers are exported from `@anchr/sdk/proofs`.
 Applications can publish their own HTTPS schema URLs for proof formats that are
 outside the v0 built-in schema set.

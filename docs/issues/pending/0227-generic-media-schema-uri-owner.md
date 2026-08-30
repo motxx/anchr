@@ -10,7 +10,7 @@ design
 ## Dependencies
 
 Depends on:
-- None
+- 0256
 
 Blocks:
 - None
@@ -22,7 +22,7 @@ Proof-schema identity is owned by `@anchr/protocol/schema` (`ProofSchema` with
 string literal defined outside that owner:
 `GenericMediaSchemaUri = "https://anchr-spec.org/spec/proof/photo/v1"` in the
 SDK. The default schema every requirement falls back to is therefore not part
-of the wire-contract package — a fourth, informal identity source (after
+of the package that defines interoperable protocol messages — a fourth, informal identity source (after
 protocol schema, root SDK schema registry, and the bundle modules), with
 interoperability implications for other implementations that only read
 `specs/` + `@anchr/protocol`.
@@ -34,13 +34,13 @@ interoperability implications for other implementations that only read
   (`requirement.schema ?? GenericMediaSchemaUri`).
 - `packages/protocol/src/schema.ts:15-17` enumerates only `TlsnV1` and
   `C2paImageV1`.
-- `docs/architecture.md` ("Evidence contract"): protocol owns schema URI
-  identifiers; SDK owns dispatch/registration.
+- `docs/architecture.md` ("Evidence requirements"): protocol owns Proof Schema
+  identifiers; SDK owns dispatch and registration.
 
 ## Acceptance
 
 - A recorded decision: the generic-media URI joins the protocol schema
-  identifiers (and `specs/` if it is part of the interoperable contract), or
+  identifiers (and `specs/` if other implementations must share it), or
   the fallback is documented as SDK-owned default behavior with the rationale
   stated where the literal is defined.
 - Either way the URI has exactly one defining site.

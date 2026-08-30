@@ -19,7 +19,7 @@ Blocks:
 
 CONTEXT.md forbids "Query"/"Job"/"task" under the "Paid Request" glossary entry,
 yet those are the dominant identifiers across ~47 source files and appear as the
-canonical kind names in the wire spec. The repo rule says CONTEXT.md vocabulary
+canonical kind names in the messaging specification. The repo rule says CONTEXT.md vocabulary
 must be used in code, docs, and specs; this is the most pervasive glossary
 violation. Decide whether to grandfather the terms or rename toward the glossary
 before doing a large rename.
@@ -32,8 +32,8 @@ before doing a large rename.
   `QueryRequestPayload`), the `Query` aggregate / `query-service.ts` /
   `query-verifier.ts`, and `specs/messaging.md` (~lines 51-53 "Job
   Request/Result/Feedback").
-- `query_id` as a raw wire field is grandfathered by architecture.md ~line 279;
-  internal type/const/module names and spec table labels are not wire fields.
+- `query_id` as a protocol field is grandfathered by architecture.md ~line 279;
+  internal type/const/module names and spec table labels are not protocol fields.
 - Additional evidence (2026-07-02 architecture review): a third vocabulary
   exists in facade user-facing copy — `customer.ts` error messaging says
   "Job Request" (e.g. `RelayPublishError` ~:107) — while "Paid Request" has
