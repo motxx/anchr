@@ -1,6 +1,6 @@
 /**
- * Schema-check contract. Each registered proof schema owns the checks that
- * evaluate its requirement and evidence payloads.
+ * Proof verification checks. Each registered Proof Schema defines the checks
+ * that evaluate its requirement and evidence payloads.
  */
 
 import type {
@@ -23,7 +23,7 @@ export interface CheckAccumulator {
 export interface VerifyProofOptions {
   /** Per-attachment Blossom decryption keys. */
   blossomKeys?: BlossomKeyMap;
-  /** Per-schema verifier configuration keyed by schema URI. */
+  /** Verifier configuration keyed by Proof Schema URL. */
   schemaOptions?: SchemaOptionsMap;
 }
 

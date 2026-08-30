@@ -85,7 +85,7 @@ export function parseC2paImageSchemaOptions(
   value: unknown,
 ): C2paImageSchemaOptions {
   if (isC2paImageSchemaOptions(value)) return value;
-  throw new Error("C2PA image schema options must be an object");
+  throw new Error("C2PA image Proof Schema options must be an object");
 }
 
 function checkC2paSignature(

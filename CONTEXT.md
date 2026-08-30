@@ -39,7 +39,7 @@ _Avoid_: Work, result, Oracle Attestation
 
 ### Proof Schema
 
-A named evidence contract that defines the requirement, proof format, and
+A named specification that defines the requirement, proof format, and
 verification rules for a Paid Request.
 _Avoid_: Verification factor, proof type, adapter
 

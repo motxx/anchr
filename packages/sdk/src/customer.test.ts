@@ -250,7 +250,7 @@ test("createCustomer copies arrays so mutating the original does not affect the 
   expect(customer.oracles).toHaveLength(2);
 });
 
-test("Customer.request rejects an invalid schema URL synchronously", async () => {
+test("Customer.request rejects an invalid Proof Schema URL synchronously", async () => {
   const customer = createCustomer(validOptions());
   await expect(
     customer.request({

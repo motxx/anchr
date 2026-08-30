@@ -126,4 +126,4 @@ for (const page of pages) {
   }
 }
 
-console.log("proof schema pages check passed");
+console.log("Proof Schema pages check passed");
