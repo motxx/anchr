@@ -36,8 +36,8 @@ from ad hoc review into one of these homes.
 | `deno task test:e2e:regtest` | `automated` | Cashu, Lightning regtest, Blossom, and full paid-request lifecycle flows. |
 | `deno task test:e2e:frost` | `automated` | FROST threshold behavior. |
 | `deno task test:e2e:tlsn` | `automated` | TLSNotary proof generation and verification. |
-| `deno task test:all` | `automated` | Local verification bar from `CLAUDE.md`. |
-| `deno task test:all:docker` | `automated` | Docker-backed verification bar from `CLAUDE.md`. |
+| `deno task test:all` | `automated` | Local verification bar from `AGENTS.md`. |
+| `deno task test:all:docker` | `automated` | Docker-backed verification bar from `AGENTS.md`. |
 | `skills/arch-lint-llm/SKILL.md` | `semantic skill` | God modules, hidden service locators, duplicated state machines, inappropriate intimacy, oversized functions, and domain leakage that deterministic architecture lint cannot prove. |
 | `skills/check-silent-bypass/SKILL.md` | `semantic skill` | Plausible-looking branches that skip verification, validation, settlement, redemption, auth, signing, or quorum checks. |
 | `skills/plain-terms/SKILL.md` | `semantic skill` | Coined compound terms that hide the concrete subject, artifact, or behavior. |
