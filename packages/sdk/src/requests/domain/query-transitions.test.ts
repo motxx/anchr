@@ -1,8 +1,31 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { isExpirable, isValidTransition } from "./query-transitions.ts";
+import {
+  isExpirable,
+  isOpenStatus,
+  isValidTransition,
+} from "./query-transitions.ts";
 
 describe("query-transitions", () => {
+  describe("isOpenStatus", () => {
+    test("pre-verification statuses are open", () => {
+      expect(isOpenStatus("pending")).toBe(true);
+      expect(isOpenStatus("awaiting_offers")).toBe(true);
+      expect(isOpenStatus("provider_selected")).toBe(true);
+      expect(isOpenStatus("processing")).toBe(true);
+    });
+
+    test("verifying is not open", () => {
+      expect(isOpenStatus("verifying")).toBe(false);
+    });
+
+    test("terminal statuses are not open", () => {
+      expect(isOpenStatus("approved")).toBe(false);
+      expect(isOpenStatus("rejected")).toBe(false);
+      expect(isOpenStatus("expired")).toBe(false);
+    });
+  });
+
   describe("isExpirable", () => {
     test("verifying is expirable", () => {
       expect(isExpirable("verifying")).toBe(true);

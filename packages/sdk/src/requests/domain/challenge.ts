@@ -19,13 +19,3 @@ export function generateNonce(length = 6): string {
   }
   return result;
 }
-
-export function buildChallengeRule(
-  nonce: string | undefined,
-  description: string,
-): string {
-  if (!nonce) {
-    return `対象（${description}）を撮影してください。来歴証明に対応したカメラでの撮影を推奨します。`;
-  }
-  return `「${nonce}」を紙に手書きし、対象（${description}）と一緒に撮影してください。手書きの文字が写真内に写っている必要があります。来歴証明に対応したカメラでの撮影を推奨します。`;
-}

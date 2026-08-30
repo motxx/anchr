@@ -16,7 +16,7 @@ const ESCROW_TRANSITIONS: Record<string, QueryStatus[]> = {
 /** Terminal states — no further transitions allowed. */
 const TERMINAL_STATUSES: QueryStatus[] = ["approved", "rejected", "expired"];
 
-const CANCELLABLE_STATUSES: QueryStatus[] = [
+const OPEN_STATUSES: QueryStatus[] = [
   "pending",
   "awaiting_offers",
   "provider_selected",
@@ -40,10 +40,6 @@ export function isValidTransition(
   return table[from]?.includes(to) ?? false;
 }
 
-export function isCancellable(status: QueryStatus): boolean {
-  return CANCELLABLE_STATUSES.includes(status);
-}
-
 export function isExpirable(status: QueryStatus): boolean {
   return EXPIRABLE_STATUSES.includes(status);
 }
@@ -52,6 +48,12 @@ export function isTerminal(status: QueryStatus): boolean {
   return TERMINAL_STATUSES.includes(status);
 }
 
+/**
+ * Pre-verification, non-terminal statuses: the query can still be
+ * cancelled. `verifying` has forward transitions but is not open —
+ * once a result is under verification, cancellation is no longer
+ * allowed.
+ */
 export function isOpenStatus(status: QueryStatus): boolean {
-  return CANCELLABLE_STATUSES.includes(status);
+  return OPEN_STATUSES.includes(status);
 }
