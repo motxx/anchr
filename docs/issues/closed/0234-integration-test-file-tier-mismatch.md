@@ -35,7 +35,7 @@ a tier.
   in-process wiring test).
 - `deno.json` `test:unit` (`--ignore=**/*.integration.test.ts`) and
   `test:integration` (find pattern) — both miss the bare name.
-- CLAUDE.md test rules: integration tier = `*.integration.test.ts`
+- AGENTS.md test rules: integration tier = `*.integration.test.ts`
   next to source, in-process transports only.
 - 0189 fixes this file's sleeps but not its tier placement.
 
