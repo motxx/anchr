@@ -10,9 +10,9 @@ The v0 paid-request exchange, Cashu Payment Lock, and redeem/refund rules are
 defined in [`paid-request-exchange.md`](paid-request-exchange.md). This document
 specifies their Nostr event encoding.
 
-Proof format dispatch uses HTTPS schema URLs defined in
+Proof format dispatch uses HTTPS Proof Schema URLs defined in
 [`proof-schemas.md`](proof-schemas.md). Public Nostr query events carry the
-schema URL in an `s` tag and a Request Notice body for discovery.
+Proof Schema URL in an `s` tag and a Request Notice body for discovery.
 Encrypted Provider Selection payloads carry the same URL in their `schema` field
 plus execution details for the selected Provider.
 
@@ -25,15 +25,14 @@ Customer/Provider field names rather than compatibility aliases.
 
 ## Canonical Implementation Owners
 
-`@anchr/protocol/events` is the canonical Nostr wire helper surface for kind
-`5300`, `6300`, `7000`, and Oracle-to-Provider release DMs. Compatible
+`@anchr/protocol/events` is the canonical Nostr event builder and parser API for
+kind `5300`, `6300`, `7000`, and Oracle-to-Provider release DMs. Compatible
 implementations should match the event shapes documented here.
 
 `@anchr/sdk/adapters/nostr` owns SDK relay transport, subscriptions, actor
 service wiring, Oracle announcement publishing, and adapter-private encryption
 helpers. It may contain internal builders used by the SDK services, but it is
-not a second public wire contract for query, result, feedback, or release
-messages.
+not a second definition of the query, result, feedback, or release messages.
 
 | Message class               | Canonical owner             | SDK adapter responsibility                                        |
 | --------------------------- | --------------------------- | ----------------------------------------------------------------- |
@@ -53,19 +52,25 @@ messages.
 | 7000  | Job Feedback       | Various           | Offers, selection, completion   |
 | 30103 | Oracle Attestation | Oracle -> Relay   | Publish a public release result |
 
-## Wire Version
+## JSON Version
 
-Kind 5300, 6300, and 7000 events built by the canonical helpers carry a
-wire-contract version tag:
+Every JSON object defined by the stable Anchr profile carries the required
+integer field `"version": 0` at its root. This applies equally to plaintext
+content and to JSON obtained after NIP-44 decryption. It is the version of that
+Anchr JSON format, not the NIP-44 encryption version, a Cashu token version, or
+a Proof Schema version.
 
-```json
-["v", "0"]
-```
+Each JSON format advances independently. Changing a Request Notice does not
+change the version of Provider Selection, Query Response, hash bootstrap, or
+Release Material. A parser chooses the expected version from the event kind and
+message type before interpreting the remaining fields. All formats in this
+profile currently use version 0; the equal values do not make them one shared
+Anchr version.
 
-Absence of the tag is read as version 0. A v0 parser MUST ignore an event
-whose `v` tag carries any other value — such an event speaks an incompatible
-future contract. The check is non-fatal and follows the universal rejection
-rule below: the event is ignored, never an error.
+Anchr does not add a `v` tag or a field directly to the Nostr Event. A version 0
+parser MUST ignore JSON with a missing, non-integer, or unsupported `version`.
+The check is non-fatal and follows the universal rejection rule below: the event
+is ignored, never an error.
 
 ## Query Posting (kind 5300)
 
@@ -74,7 +79,7 @@ The Customer broadcasts a DVM Job Request as a Request Notice:
 ```json
 {
   "kind": 5300,
-  "content": "{\"query_id\":\"query_123\", ...}",
+  "content": "{\"version\":0,\"query_id\":\"query_123\", ...}",
   "tags": [
     ["d", "<query_id>"],
     ["t", "anchr"],
@@ -84,15 +89,15 @@ The Customer broadcasts a DVM Job Request as a Request Notice:
 }
 ```
 
-An optional `region` tag (uppercase region code, indexable as `#region`)
-scopes discovery: region-bound Providers subscribe with a `#region` filter and
-ignore untagged notices. The tag is cleartext and relay-indexable: any
-relay observer can partition requests by region, shrinking the requester's
-anonymity set from "all requesters" to "requesters in that region". Omit the
-tag when regional scoping is not required. Hiding notice content from
-out-of-region relay observers via a region-derived shared key remains an
-SDK-local optional layer (`@anchr/sdk/adapters/nostr` encryption helpers), not
-part of the interoperable v0 profile.
+An optional `region` tag (uppercase region code, indexable as `#region`) scopes
+discovery: Providers assigned to a region subscribe with a `#region` filter and
+ignore untagged notices. The tag is cleartext and relay-indexable: any relay
+observer can partition requests by region, shrinking the requester's anonymity
+set from "all requesters" to "requesters in that region". Omit the tag when
+regional scoping is not required. Hiding notice content from out-of-region relay
+observers via a region-derived shared key remains an SDK-local optional layer
+(`@anchr/sdk/adapters/nostr` encryption helpers), not part of the interoperable
+v0 profile.
 
 The request content is signed JSON, not encrypted NIP-44 content. Its content is
 an explicit public allowlist for open Provider discovery. Sensitive execution
@@ -102,19 +107,20 @@ helper does not use a NIP-90 `bid` tag for payment material.
 
 ### QueryRequestPayload
 
-| Field             | Description                                      |
-| ----------------- | ------------------------------------------------ |
-| `query_id`        | Caller-chosen query id; SHOULD match the `d` tag |
-| `schema`          | Proof schema URL                                 |
-| `customer_pubkey` | Customer Nostr pubkey                            |
-| `oracle_pubkey`   | Oracle Nostr pubkey                              |
-| `max_amount_sats` | Customer Payment Budget in sats                  |
+| Field             | Description                                                                  |
+| ----------------- | ---------------------------------------------------------------------------- |
+| `version`         | Anchr JSON version; MUST be integer `0`                                      |
+| `query_id`        | Caller-chosen query id; SHOULD match the `d` tag                             |
+| `schema`          | Proof Schema URL                                                             |
+| `customer_pubkey` | Customer Nostr pubkey                                                        |
+| `oracle_pubkey`   | Oracle Nostr pubkey                                                          |
+| `max_amount_sats` | Customer Payment Budget in sats                                              |
 | `expires_at`      | Offer cutoff as Unix milliseconds at second granularity (a multiple of 1000) |
 
 The public content MUST NOT include `predicate`, `context`, `mint_url`,
 `payment_lock`, `payment_lock_token`, `bounty_token`,
-`provider_redemption_token`, or `locktime_seconds`. The canonical parser
-rejects a Request Notice carrying any of these field names.
+`provider_redemption_token`, or `locktime_seconds`. The canonical parser rejects
+a Request Notice carrying any of these field names.
 
 ## Provider Offer (kind 7000, status=payment-required)
 
@@ -123,7 +129,7 @@ A Provider discovers the query and submits an offer:
 ```json
 {
   "kind": 7000,
-  "content": "{\"status\":\"payment-required\", ...}",
+  "content": "{\"version\":0,\"status\":\"payment-required\", ...}",
   "tags": [
     ["e", "<job_request_event_id>", "", "request"],
     ["p", "<customer_pubkey>"],
@@ -132,8 +138,8 @@ A Provider discovers the query and submits an offer:
 }
 ```
 
-The offer content is signed JSON with `status`, `provider_pubkey`, and
-`amount_sats`. The `amount_sats` field is the Provider's Requested Payment
+The offer content is signed JSON with `version`, `status`, `provider_pubkey`,
+and `amount_sats`. The `amount_sats` field is the Provider's Requested Payment
 Amount. The `provider_pubkey` must match the event author.
 
 ## Provider Selection (kind 7000, status=processing)
@@ -158,22 +164,24 @@ The encrypted content includes:
 
 | Field                       | Description                                             |
 | --------------------------- | ------------------------------------------------------- |
+| `version`                   | Anchr JSON version; MUST be integer `0`                 |
+| `status`                    | MUST be `"processing"`                                  |
 | `selected_provider_pubkey`  | Selected Provider Nostr pubkey                          |
 | `provider_redemption_token` | Token the selected Provider redeems after valid release |
 | `execution`                 | Provider-only execution payload and payment-lock terms  |
 
 The `execution` object includes:
 
-| Field              | Description                                                |
-| ------------------ | ---------------------------------------------------------- |
-| `schema`           | Proof schema URL                                           |
-| `predicate`        | Schema-owned requirement payload interpreted by the proof schema |
-| `description`      | Optional human-readable request detail                     |
-| `context`          | Optional schema-agnostic context                           |
-| `mint_url`         | Cashu mint URL for the v0 Payment Lock                     |
-| `max_amount_sats`  | Customer Payment Budget in sats                            |
+| Field              | Description                                                                                            |
+| ------------------ | ------------------------------------------------------------------------------------------------------ |
+| `schema`           | Proof Schema URL                                                                                       |
+| `predicate`        | Requirement payload defined and interpreted by the Proof Schema                                        |
+| `description`      | Optional human-readable request detail                                                                 |
+| `context`          | Optional schema-agnostic context                                                                       |
+| `mint_url`         | Cashu mint URL for the v0 Payment Lock                                                                 |
+| `max_amount_sats`  | Customer Payment Budget in sats                                                                        |
 | `amount_sats`      | Selected Provider Offer amount in sats; the Provider Redemption Token must carry this exact net amount |
-| `locktime_seconds` | Cashu refund locktime as an absolute Unix timestamp in seconds, computed at selection time |
+| `locktime_seconds` | Cashu refund locktime as an absolute Unix timestamp in seconds, computed at selection time             |
 
 Sensitive context (session IDs, auth headers) is encrypted to the Provider and
 never stored publicly.
@@ -183,7 +191,7 @@ never stored publicly.
 Before irreversible work, the Provider verifies that the selected Cashu payment
 material corresponds to the request, the selected Provider pubkey, the expected
 Oracle, and the Cashu lock conditions. Any local preflight record is
-implementation state, not Nostr wire data.
+implementation state, not data in a Nostr event.
 
 ## Proof Submission (kind 6300)
 
@@ -204,11 +212,12 @@ The Provider submits the result:
 
 ### QueryResponsePayload
 
-| Field    | Description                                                        |
-| -------- | ------------------------------------------------------------------ |
-| `schema` | Proof schema URL used to dispatch Oracle and Customer verification |
-| `data`   | Schema-owned response evidence payload                            |
-| `proof`  | Schema-owned proof evidence payload, usually base64 or hex         |
+| Field     | Description                                                                       |
+| --------- | --------------------------------------------------------------------------------- |
+| `version` | Anchr JSON version; MUST be integer `0`                                           |
+| `schema`  | Proof Schema URL used to dispatch Oracle and Customer verification                |
+| `data`    | Response evidence whose format is defined by the Proof Schema                     |
+| `proof`   | Proof evidence whose format is defined by the Proof Schema, usually base64 or hex |
 
 When an Oracle pubkey is provided, the result also carries an `oracle_payload`
 tag encrypted to the Oracle. The Oracle-readable payload adds `query_id` and
@@ -243,18 +252,20 @@ public by design — they carry no secret material):
 
 ### OracleAttestationPayload
 
-| Field           | Description                                                       |
-| --------------- | ---------------------------------------------------------------- |
-| `oracle_id`     | Oracle identity that produced the attestation                    |
-| `query_id`      | Query this attestation covers                                    |
-| `passed`        | Whether verification passed                                      |
-| `checks`        | Human-readable checks that ran                                   |
-| `failures`      | Human-readable failures, empty when `passed` is true             |
-| `attested_at`   | Unix seconds when the attestation was produced                   |
-| `details`       | Optional schema-owned verifier-detail payload                    |
+| Field         | Description                                           |
+| ------------- | ----------------------------------------------------- |
+| `version`     | Anchr JSON version; MUST be integer `0`               |
+| `oracle_id`   | Oracle identity that produced the attestation         |
+| `query_id`    | Query this attestation covers                         |
+| `passed`      | Whether verification passed                           |
+| `checks`      | Human-readable checks that ran                        |
+| `failures`    | Human-readable failures, empty when `passed` is true  |
+| `attested_at` | Unix seconds when the attestation was produced        |
+| `details`     | Optional verifier details defined by the Proof Schema |
 
 The `schema` value selected verification, so `details` is interpreted only by
-the schema that produced it. Shared attestation fields remain schema-neutral.
+that Proof Schema. The other attestation fields do not depend on a particular
+Proof Schema.
 
 Attestations are advisory and public: they do not gate Cashu redemption, which
 is enforced by the mint's HTLC/P2PK spending conditions. Consumers MUST ignore
@@ -273,7 +284,7 @@ If a future version promotes completion feedback into the interoperable profile,
 that version must define payload fields, causal tags, parser behavior, and tests
 in `@anchr/protocol/events`.
 
-Example SDK-local draft shape:
+Example draft format used only by the SDK:
 
 ```json
 {
@@ -299,31 +310,33 @@ as preimage delivery use NIP-44 direct messages between specific pubkeys.
 ## Hash Bootstrap (kind 4)
 
 Before locking payment, the Customer obtains the hash commitment `H` from the
-designated Oracle over the relay. The Provider may request the same
-query-bound hash before irreversible work to validate that the selected Payment
-Lock is locked to the Oracle's commitment. Both messages are NIP-44 kind `4`
-DMs; no HTTP endpoint is required on either side.
+designated Oracle over the relay. The Provider may request the same hash tied to
+the query before irreversible work to validate that the selected Payment Lock is
+locked to the Oracle's commitment. Both messages are NIP-44 kind `4` DMs; no
+HTTP endpoint is required on either side.
 
 Customer → Oracle request content:
 
-| Field      | Description                                |
-| ---------- | ------------------------------------------ |
-| `type`     | `"hash_request"`                           |
+| Field      | Description                               |
+| ---------- | ----------------------------------------- |
+| `version`  | Anchr JSON version; MUST be integer `0`   |
+| `type`     | `"hash_request"`                          |
 | `query_id` | Caller-chosen unique id the hash binds to |
 
 Oracle → Customer response content:
 
-| Field      | Description                                          |
-| ---------- | ---------------------------------------------------- |
-| `type`     | `"hash_response"`                                    |
-| `query_id` | Matches the request                                  |
+| Field      | Description                                             |
+| ---------- | ------------------------------------------------------- |
+| `version`  | Anchr JSON version; MUST be integer `0`                 |
+| `type`     | `"hash_response"`                                       |
+| `query_id` | Matches the request                                     |
 | `hash`     | Hex `H = sha256(S)`; the Oracle holds `S` until release |
 
-The request SHOULD be sent under a fresh ephemeral keypair so the bootstrap
-is unlinkable from the later kind `5300` Request Notice. The Oracle answers
-the sender pubkey and MUST be idempotent per `query_id` (a retried request
-returns the same `hash`). An Oracle-operated HTTP `POST /hash` adapter may
-exist as deployment policy, but the interoperable default is this DM pair.
+The request SHOULD be sent under a fresh ephemeral keypair so the bootstrap is
+unlinkable from the later kind `5300` Request Notice. The Oracle answers the
+sender pubkey and MUST be idempotent per `query_id` (a retried request returns
+the same `hash`). An Oracle-operated HTTP `POST /hash` adapter may exist as
+deployment policy, but the interoperable default is this DM pair.
 
 ## Release Material and Redeem Gate
 
@@ -335,6 +348,7 @@ payload binds:
 
 | Field              | Description                                       |
 | ------------------ | ------------------------------------------------- |
+| `version`          | Anchr JSON version; MUST be integer `0`           |
 | `query_id`         | Query identifier from the Customer request        |
 | `request_event_id` | Original kind 5300 event id                       |
 | `preimage`         | Cashu HTLC preimage for the selected Payment Lock |
@@ -348,8 +362,8 @@ adapter currently uses encrypted kind `4` DMs with a `frost_signature` payload
 for P2PK+FROST flows, and tests that adapter behavior under
 `packages/sdk/src/adapters/nostr/events/frost-dm.test.ts` and
 `packages/sdk/src/adapters/nostr/oracle-frost.test.ts`. Those messages are not
-part of the stable `@anchr/protocol/events` helper surface and are not required
-for compatible paid-request implementations.
+exported by `@anchr/protocol/events` and are not required for compatible
+paid-request implementations.
 
 ## Release Delivery Reliability
 
@@ -385,7 +399,7 @@ relays.
 
 ### Deletion Policy
 
-The public Nostr contract does not specify Oracle retry-store deletion rules.
+This specification does not define Oracle retry-store deletion rules.
 Implementations must not represent a stricter retention guarantee as
 interoperable behavior unless a future profile standardizes and tests it.
 
@@ -393,34 +407,34 @@ interoperable behavior unless a future profile standardizes and tests it.
 
 Every canonical parser returns null instead of throwing when an event is not
 addressed to the caller, fails decryption, fails JSON parsing, or misses a
-required field or binding tag. Consumers MUST ignore such events and keep
-their subscriptions open: an unparseable event is someone else's traffic, not
-a protocol error.
+required field or binding tag. Consumers MUST ignore such events and keep their
+subscriptions open: an unparseable event is someone else's traffic, not a
+protocol error.
 
 Causal binding rides on tags and payload fields, never on arrival order:
 
-- an offer binds to its request via the `e` tag and addresses the Customer
-  via the `p` tag; the canonical parser rejects an offer missing either;
-- a selection binds to the request `e` tag and addresses exactly one
-  Provider `p` tag;
-- a result binds to the request `e` tag, and the Oracle-readable payload
-  repeats `query_id` and `request_event_id` so the Oracle rejects a payload
-  bound to a different request;
+- an offer binds to its request via the `e` tag and addresses the Customer via
+  the `p` tag; the canonical parser rejects an offer missing either;
+- a selection binds to the request `e` tag and addresses exactly one Provider
+  `p` tag;
+- a result binds to the request `e` tag, and the Oracle-readable payload repeats
+  `query_id` and `request_event_id` so the Oracle rejects a payload bound to a
+  different request;
 - Release Material DMs repeat `query_id` for anti-replay.
 
 Consumers MUST tolerate relay redelivery and out-of-order arrival: an event
-referencing an unknown or already-settled request is ignored. The only
-ordering requirement is causal — act on a result only after its request, and
-on Release Material only after a result the Oracle accepted.
+referencing an unknown or already-settled request is ignored. The only ordering
+requirement is causal — act on a result only after its request, and on Release
+Material only after a result the Oracle accepted.
 
-## Schema Namespace
+## Proof Schema URLs
 
-Proof schema URLs, their shape, and the permissionless allocation process are
-owned by [`proof-schemas.md`](proof-schemas.md). Built-in schemas are added
-there (and served from `spec-site/`) before any implementation advertises
-them; vendor schemas use an HTTPS authority the vendor controls. An unknown
-schema URL is not an error at the messaging layer — it fails at verifier
-dispatch.
+Proof Schema URLs, their format, and the permissionless allocation process are
+owned by [`proof-schemas.md`](proof-schemas.md). Built-in Proof Schemas are
+added there (and served from `spec-site/`) before any implementation advertises
+them; vendor Proof Schemas use an HTTPS authority the vendor controls. An
+unknown Proof Schema URL is not an error at the messaging layer — it fails at
+verifier dispatch.
 
 ## Transport Scope
 

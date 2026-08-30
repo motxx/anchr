@@ -1,6 +1,6 @@
 /**
- * SDK-local Oracle↔Provider release DM payload shapes that ride next to the
- * canonical wire contract (`@anchr/protocol/events`). The Oracle-readable
+ * SDK-local Oracle↔Provider release DM payloads outside the public
+ * `@anchr/protocol/events` API. The Oracle-readable
  * result payload in `oracle_payload` tags is owned by the canonical
  * `parseOracleQueryResponseEvent`.
  */

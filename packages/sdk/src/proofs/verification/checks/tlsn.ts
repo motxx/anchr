@@ -73,7 +73,7 @@ function schemaOptionsRecord(value: unknown): Record<string, unknown> {
 
 export function parseTlsnSchemaOptions(value: unknown): TlsnSchemaOptions {
   if (isTlsnSchemaOptions(value)) return value;
-  throw new Error("TLSNotary schema options must be an object");
+  throw new Error("TLSNotary Proof Schema options must be an object");
 }
 
 async function verifyTlsnExtensionResult(
