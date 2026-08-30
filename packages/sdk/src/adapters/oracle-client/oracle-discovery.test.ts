@@ -6,6 +6,8 @@ import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import { ProofSchema } from "../../schema.ts";
 import { parseOracleAnnouncementEvent } from "./oracle-discovery.ts";
 import type { OracleInfo } from "../../requests/domain/oracle-types.ts";
+import { ORACLE_ANNOUNCEMENT_VERSION } from "../nostr/events/versions.ts";
+import { isRecord } from "../../internal/runtime/types.ts";
 
 const FULL_ORACLE_INFO: OracleInfo = {
   id: "test-oracle",
@@ -61,6 +63,7 @@ test("buildOracleAnnouncementEvent content is valid JSON with announcement paylo
   const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
 
   const content = JSON.parse(event.content);
+  expect(content.version).toBe(ORACLE_ANNOUNCEMENT_VERSION);
   expect(content.name).toBe("Test Oracle");
   expect(content.fee_ppm).toBe(50000);
   expect(content.supported_schemas).toEqual(FULL_ORACLE_INFO.supported_schemas);
@@ -125,6 +128,7 @@ test("parseOracleAnnouncementEvent parses a valid event", () => {
 
   const announcement = parseOracleAnnouncementEvent(event);
   expect(announcement).not.toBeNull();
+  expect(announcement!.version).toBe(ORACLE_ANNOUNCEMENT_VERSION);
   expect(announcement!.id).toBe("test-oracle");
   expect(announcement!.name).toBe("Test Oracle");
   expect(announcement!.endpoint).toBe("https://oracle.example.com");
@@ -156,6 +160,21 @@ test("parseOracleAnnouncementEvent returns null for invalid content", () => {
 
   const result = parseOracleAnnouncementEvent(badEvent);
   expect(result).toBeNull();
+});
+
+test("parseOracleAnnouncementEvent rejects a missing or unsupported version", () => {
+  const identity = generateEphemeralIdentity();
+  const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
+  const { version: _version, ...unversioned } = JSON.parse(event.content);
+
+  expect(parseOracleAnnouncementEvent({
+    ...event,
+    content: JSON.stringify(unversioned),
+  })).toBeNull();
+  expect(parseOracleAnnouncementEvent({
+    ...event,
+    content: JSON.stringify({ ...unversioned, version: 1 }),
+  })).toBeNull();
 });
 
 test("parseOracleAnnouncementEvent returns null when d tag is missing", () => {
@@ -194,9 +213,11 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
     created_at: 1700000000,
     tags: [["d", "minimal"]],
     content: JSON.stringify({
+      version: ORACLE_ANNOUNCEMENT_VERSION,
       name: "Minimal",
       fee_ppm: 5000,
       supported_schemas: [],
+      supported_payment_lock_types: [],
     }),
     pubkey: "deadbeef",
     id: "fake",
@@ -216,12 +237,13 @@ test("parseOracleAnnouncementEvent handles minimal content gracefully", () => {
   expect(result!.description).toBeUndefined();
 });
 
-test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
+test("parseOracleAnnouncementEvent rejects malformed capability values", () => {
   const event = {
     kind: 30088,
     created_at: 1700000000,
     tags: [["d", "schema-filter"]],
     content: JSON.stringify({
+      version: ORACLE_ANNOUNCEMENT_VERSION,
       name: "Schema Filter",
       fee_ppm: 5000,
       supported_schemas: [
@@ -229,6 +251,7 @@ test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
         "tlsn",
         "http://anchr-spec.org/spec/proof/tlsn/v1",
       ],
+      supported_payment_lock_types: [],
     }),
     pubkey: "deadbeef",
     id: "fake",
@@ -236,8 +259,39 @@ test("parseOracleAnnouncementEvent ignores malformed schema values", () => {
   };
 
   const result = parseOracleAnnouncementEvent(event);
-  expect(result).not.toBeNull();
-  expect(result!.supported_schemas).toEqual([ProofSchema.TlsnV1]);
+  expect(result).toBeNull();
+});
+
+test("parseOracleAnnouncementEvent requires both capability arrays", () => {
+  const identity = generateEphemeralIdentity();
+  const event = buildOracleAnnouncementEvent(identity, FULL_ORACLE_INFO);
+  const content: unknown = JSON.parse(event.content);
+  if (!isRecord(content)) throw new TypeError("expected announcement object");
+
+  for (
+    const key of [
+      "supported_schemas",
+      "supported_payment_lock_types",
+    ] as const
+  ) {
+    const { [key]: _removed, ...withoutRequiredField } = content;
+    expect(parseOracleAnnouncementEvent({
+      ...event,
+      content: JSON.stringify(withoutRequiredField),
+    })).toBeNull();
+    expect(parseOracleAnnouncementEvent({
+      ...event,
+      content: JSON.stringify({ ...content, [key]: "invalid" }),
+    })).toBeNull();
+  }
+
+  expect(parseOracleAnnouncementEvent({
+    ...event,
+    content: JSON.stringify({
+      ...content,
+      supported_payment_lock_types: ["unknown"],
+    }),
+  })).toBeNull();
 });
 
 test("parseOracleAnnouncementEvent ignores obsolete supported_escrow_types field", () => {
@@ -246,9 +300,11 @@ test("parseOracleAnnouncementEvent ignores obsolete supported_escrow_types field
     created_at: 1700000000,
     tags: [["d", "old-field"]],
     content: JSON.stringify({
+      version: ORACLE_ANNOUNCEMENT_VERSION,
       name: "Old Field",
       fee_ppm: 5000,
       supported_schemas: [],
+      supported_payment_lock_types: [],
       supported_escrow_types: ["htlc"],
     }),
     pubkey: "deadbeef",

@@ -8,9 +8,9 @@ Customer selects exactly one Provider, the selected Provider submits work with
 proof material, and an Oracle releases Cashu unlock material only after
 verification succeeds.
 
-This spec defines the exchange contract that keeps proof verification and
-payment release linked. [`messaging.md`](messaging.md) defines the Nostr/NIP-90
-event encoding for this contract.
+This specification defines how the Paid Request exchange keeps proof
+verification and payment release linked. [`messaging.md`](messaging.md) defines
+its Nostr/NIP-90 event encoding.
 
 ## Substrate
 
@@ -51,17 +51,17 @@ Each step must preserve these links:
 
 | Step                  | Required link                                                                                                                                                                              |
 | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `request`             | Request Notice with Customer pubkey, query id, proof schema URL, Oracle pubkey, Payment Budget, and offer expiry.                                                                          |
+| `request`             | Request Notice with Customer pubkey, query id, Proof Schema URL, Oracle pubkey, Payment Budget, and offer expiry.                                                                          |
 | `provider_offer`      | Provider pubkey, request event reference, Requested Payment Amount, and offer status.                                                                                                      |
 | `provider_selection`  | Request event reference, selected Provider pubkey, encrypted Provider Redemption Token, and encrypted execution payload with predicate, Cashu mint URL, and Cashu locktime.                |
-| `proof_submission`    | Request event reference, selected Provider identity, proof schema URL, proof payload or attachment references, Customer-readable encrypted content, and Oracle-readable encrypted content. |
-| `oracle_verification` | Proof decision made against the request, proof schema, predicate, submitted proof material, and expected Oracle authority.                                                                 |
+| `proof_submission`    | Request event reference, selected Provider identity, Proof Schema URL, proof payload or attachment references, Customer-readable encrypted content, and Oracle-readable encrypted content. |
+| `oracle_verification` | Proof decision made against the request, Proof Schema, predicate, submitted proof material, and expected Oracle authority.                                                                 |
 | `release`             | Release Material sent by the expected Oracle to the selected Provider and bound to the query and request event.                                                                            |
 | `redeem_or_refund`    | Provider redeems before locktime with valid Release Material and Provider authorization, or Customer refunds through the Cashu timeout path.                                               |
 
 Local actor state such as retry queues, projections, preflight records, and
-audit logs is not part of the exchange contract unless it is serialized in the
-Nostr event encoding.
+audit logs is not part of the exchange specification unless it is serialized in
+the Nostr event encoding.
 
 ## Cashu Payment Lock
 
@@ -131,11 +131,11 @@ message_i = sha256(utf8(proof_i.secret))
 ```
 
 The Oracle release material for `p2pk_frost` is the ordered array of aggregated
-BIP-340 FROST signatures, one entry per proof in the encoded Provider
-Redemption Token. A Provider redeems by signing the same proofs with its
-Provider key, appending the corresponding group signature to each proof
-witness, and swapping the signed proofs at the mint. The Provider does not need
-and must not receive a FROST group private key.
+BIP-340 FROST signatures, one entry per proof in the encoded Provider Redemption
+Token. A Provider redeems by signing the same proofs with its Provider key,
+appending the corresponding group signature to each proof witness, and swapping
+the signed proofs at the mint. The Provider does not need and must not receive a
+FROST group private key.
 
 `SIG_INPUTS` is required because peers can derive each mint-spendable message
 from the token they verify. `SIG_ALL` would include the Provider's chosen swap
@@ -150,8 +150,8 @@ FROST P2PK release, it MUST:
   verified requirement;
 - verify every token proof is a P2PK proof whose lock includes this peer's
   configured FROST group pubkey and `n_sigs=2`;
-- accept only messages in the derived set
-  `sha256(utf8(proof.secret))` for that token.
+- accept only messages in the derived set `sha256(utf8(proof.secret))` for that
+  token.
 
 The coordinator MUST run a separate FROST signing session for each proof
 message. Nonces from one proof message are never reused for another proof

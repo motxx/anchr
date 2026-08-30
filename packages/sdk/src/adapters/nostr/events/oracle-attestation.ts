@@ -14,8 +14,10 @@ import {
 import type { NostrIdentity } from "../../../identity.ts";
 import type { OracleAttestation } from "../../../requests/domain/oracle-types.ts";
 import { KIND_ORACLE_ATTESTATION } from "@anchr/protocol/nostr";
+import { ORACLE_ATTESTATION_VERSION } from "./versions.ts";
 
 export interface OracleAttestationPayload {
+  version: typeof ORACLE_ATTESTATION_VERSION;
   oracle_id: string;
   query_id: string;
   passed: boolean;
@@ -38,6 +40,7 @@ function isOracleAttestationPayload(
   value: unknown,
 ): value is OracleAttestationPayload {
   return isRecord(value) &&
+    value.version === ORACLE_ATTESTATION_VERSION &&
     typeof value.oracle_id === "string" &&
     typeof value.query_id === "string" &&
     typeof value.passed === "boolean" &&
@@ -58,6 +61,7 @@ export function buildOracleAttestationEvent(
   attestation: OracleAttestation,
 ): VerifiedEvent {
   const payload: OracleAttestationPayload = {
+    version: ORACLE_ATTESTATION_VERSION,
     oracle_id: attestation.oracle_id,
     query_id: attestation.query_id,
     passed: attestation.passed,

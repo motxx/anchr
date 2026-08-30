@@ -41,7 +41,7 @@ closing together.
 - `verifyPreimageHash` validates `/^([0-9a-f]{2})+$/i` and returns `false` on
   malformed input.
 - Share submissions are authenticated to the signer identity.
-- Provider-facing rejection wire messages are generic (details stay in local
+- Rejection messages sent to the Provider are generic (details stay in local
   logs).
 
 ## Verification
@@ -49,6 +49,10 @@ closing together.
 - Unit test: malformed preimage returns `false`, not a throw.
 - Unit test: a share submitted under a slot the caller does not own is
   rejected.
+- Unit tests assert that each Provider-facing rejection uses its fixed public
+  reason and contains no expected or received hash, Release Material, proof,
+  mint response, internal exception text, or dynamically derived payment
+  detail. Diagnostic values remain only in local logs.
 
 ## Plan
 

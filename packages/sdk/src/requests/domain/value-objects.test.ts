@@ -66,7 +66,6 @@ describe("validateQueryInput", () => {
       description: "Photo",
       location_hint: "Tokyo",
       schema_requirement: { target_url: "https://example.com/api" },
-      visibility: "public",
     })).toBeNull();
   });
   test("empty description", () => {
@@ -79,12 +78,6 @@ describe("validateQueryInput", () => {
     expect(validateQueryInput({
       description: "Photo",
       schema_requirement: { target_url: "" },
-    })).toBeNull();
-  });
-  test("schema_requirement does not require visibility", () => {
-    expect(validateQueryInput({
-      description: "Photo",
-      schema_requirement: { target_url: "https://api.example.com/data" },
     })).toBeNull();
   });
 });

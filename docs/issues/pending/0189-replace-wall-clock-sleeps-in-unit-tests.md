@@ -25,7 +25,7 @@ I/O-free and deterministic.
 ## Rationale
 
 - `packages/sdk/src/provider.test.ts` (~20 sleeps at 5/10/30/60/70/80 ms),
-  `integration.test.ts` (~lines 177, 206, 243),
+  `paid-request.integration.test.ts` (~lines 177, 206, 243),
   `requests/application/query-service-lifecycle.test.ts`.
 
 ## Acceptance

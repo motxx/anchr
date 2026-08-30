@@ -83,7 +83,7 @@ async function waitFor(
   }
 }
 
-describe("oracle-service relay integration (canonical wire contract)", () => {
+describe("oracle-service relay integration (protocol messages)", () => {
   beforeEach(() => {
     clearIntegrityStore();
   });

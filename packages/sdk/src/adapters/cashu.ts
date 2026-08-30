@@ -1,6 +1,6 @@
 /**
  * Cashu HTLC client — wraps `@cashu/cashu-ts` v3 for the SDK's
- * Customer / Provider wire flow.
+ * Customer / Provider payment-message flow.
  *
  * The Customer binds funding proofs after selecting a Provider. `bindProvider`
  * swaps the funding proofs into new proofs locked under
