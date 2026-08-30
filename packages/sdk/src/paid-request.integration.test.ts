@@ -1,7 +1,7 @@
 /**
- * In-process wiring tests — co-execute Customer + Provider + a fake
- * oracle against a fully mocked transport (in-memory relay) and a fully
- * mocked Cashu mint (stubbed CashuClient). They verify that the SDK's
+ * In-process Paid Request integration test — co-executes Customer + Provider +
+ * a fake oracle against a fully mocked transport (in-memory relay) and a fully
+ * mocked Cashu mint (stubbed CashuClient). It verifies that the SDK's
  * event builders/parsers and Customer/Provider state machines compose
  * correctly without touching any external infrastructure.
  *
@@ -138,7 +138,7 @@ function makeCashuClient(): CashuClient {
 
 // --- End-to-end test ---
 
-test("in-process wiring: customer.request returns the provider's data via a shared mock relay (no real mint, no real network)", async () => {
+test("in-process Paid Request returns the Provider's data through a shared mock relay (no real mint, no real network)", async () => {
   const relay = new MockRelay();
   const oracleKey = generateKeypair();
   const customerCashuClient = makeCashuClient();

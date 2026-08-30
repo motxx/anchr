@@ -2,6 +2,7 @@
 
 Created: 2026-07-03
 Model: Claude Fable 5
+Completed: 2026-08-30
 
 ## Priority
 
@@ -53,3 +54,33 @@ a tier.
 ## Plan
 
 - Rename the file; re-run both tiers.
+
+## Resolution
+
+Implemented by updating:
+
+- `packages/sdk/src/integration.test.ts` to
+  `packages/sdk/src/paid-request.integration.test.ts`
+- `docs/issues/pending/0189-replace-wall-clock-sleeps-in-unit-tests.md`
+- `docs/issues/pending/0235-enforce-unit-tier-no-io-permissions.md`
+
+Verified with:
+
+- `deno task test:integration`
+- `deno task test:unit`
+- `deno task check`
+- `deno task test:all`
+
+Harness update:
+
+- None — the existing unit exclusion and integration discovery globs enforce
+  the documented `*.integration.test.ts` tier once the file follows that
+  convention.
+
+Review residuals:
+
+- None
+
+Follow-up:
+
+- 0235 is unblocked.
