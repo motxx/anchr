@@ -1,6 +1,6 @@
 #!/usr/bin/env -S deno run --allow-read
 /**
- * Type-safety lint — enforces the type-safety bar from CLAUDE.md.
+ * Type-safety lint — enforces the type-safety bar from AGENTS.md.
  *
  * Hard-fail rules (always error):
  *   [T001]  ` as any`                       — bypasses the type system
