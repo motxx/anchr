@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>C2PA Image Proof Schema v1</title>
+    <style>
+      body {
+        color: #171717;
+        font-family: system-ui, sans-serif;
+        line-height: 1.55;
+        margin: 3rem auto;
+        max-width: 880px;
+        padding: 0 1.25rem;
+      }
+      code, pre {
+        background: #f3f4f6;
+        border-radius: 4px;
+      }
+      code {
+        padding: 0.1rem 0.25rem;
+      }
+      pre {
+        overflow: auto;
+        padding: 1rem;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+      }
+      td, th {
+        border: 1px solid #d4d4d4;
+        padding: 0.5rem;
+        text-align: left;
+        vertical-align: top;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>C2PA Image Proof Schema v1</h1>
+    <p>
+      Canonical schema URL:
+      <code>https://anchr-spec.org/spec/proof/c2pa-image/v1</code>
+    </p>
+    <p>
+      This schema identifies an image proof whose C2PA Content Credentials
+      manifest is cryptographically verified and whose signed GPS assertion is
+      bound to the request's expected location.
+    </p>
+
+    <h2>Predicate Shape</h2>
+    <p>
+      The predicate describes the expected capture location and accepted
+      distance window for the signed GPS assertion.
+    </p>
+    <pre><code>{
+  "expected_gps": { "lat": 35.6762, "lon": 139.6503 },
+  "max_distance_km": 1,
+  "accepted_mime_types": ["image/jpeg", "image/png", "image/webp"]
+}</code></pre>
+    <table>
+      <thead>
+        <tr>
+          <th>Field</th>
+          <th>Meaning</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>expected_gps</code></td>
+          <td>
+            Latitude and longitude the signed C2PA GPS assertion must match.
+          </td>
+        </tr>
+        <tr>
+          <td><code>max_distance_km</code></td>
+          <td>
+            Maximum accepted distance between signed GPS and expected GPS.
+          </td>
+        </tr>
+        <tr>
+          <td><code>accepted_mime_types</code></td>
+          <td>Optional image media types accepted by the verifier.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h2>Proof Payload Shape</h2>
+    <p>
+      The proof payload contains the image bytes or an encrypted attachment
+      reference to the exact image bytes. The image must carry a C2PA manifest
+      with an EXIF GPS assertion.
+    </p>
+    <pre><code>{
+  "image": "&lt;bytes or attachment reference&gt;",
+  "filename": "capture.jpg",
+  "mime_type": "image/jpeg"
+}</code></pre>
+
+    <h2>Response Data Shape</h2>
+    <p>
+      On success, verifiers expose the verified manifest summary and signed
+      coordinates used for the verdict.
+    </p>
+    <pre><code>{
+  "claim_generator": "camera-or-app-name",
+  "signature_issuer": "certificate issuer",
+  "signed_at": "2026-06-11T00:00:00Z",
+  "gps": { "lat": 35.6762, "lon": 139.6503 },
+  "distance_km": 0.0
+}</code></pre>
+
+    <h2>Verification Requirements</h2>
+    <ul>
+      <li>Reject payloads without a C2PA active manifest.</li>
+      <li>Verify the C2PA manifest signature cryptographically.</li>
+      <li>
+        Reject manifests with claim-signature or assertion data-hash failures.
+      </li>
+      <li>
+        Extract GPS only from an EXIF assertion covered by the verified
+        manifest.
+      </li>
+      <li>
+        Reject payloads whose verified manifest does not contain signed GPS.
+      </li>
+      <li>
+        Reject payloads whose signed GPS is farther than
+        <code>max_distance_km</code> from <code>expected_gps</code>.
+      </li>
+      <li>Reject unsupported or non-image payload types.</li>
+    </ul>
+  </body>
+</html>
