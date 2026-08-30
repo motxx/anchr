@@ -5,13 +5,7 @@
  * request service can resolve against.
  */
 
-export {
-  createOracleRegistry,
-  getOracle,
-  listOracles,
-  registerOracle,
-  resolveOracle,
-} from "./registry.ts";
+export { createOracleRegistry } from "./registry.ts";
 export type { OracleRegistry } from "../../requests/application/ports.ts";
 export type {
   Oracle,

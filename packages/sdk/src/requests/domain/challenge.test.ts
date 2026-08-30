@@ -1,6 +1,6 @@
 import { describe, test } from "@std/testing/bdd";
 import { expect } from "@std/expect";
-import { buildChallengeRule, generateNonce } from "./challenge.ts";
+import { generateNonce } from "./challenge.ts";
 
 describe("generateNonce", () => {
   test("returns string of default length 6", () => {
@@ -27,26 +27,5 @@ describe("generateNonce", () => {
     const nonces = new Set(Array.from({ length: 20 }, () => generateNonce()));
     // With 29^6 possible values, collisions in 20 draws are extremely unlikely
     expect(nonces.size).toBeGreaterThan(15);
-  });
-});
-
-describe("buildChallengeRule", () => {
-  test("includes nonce and description when nonce provided", () => {
-    const rule = buildChallengeRule("ABC123", "東京タワー");
-    expect(rule).toContain("ABC123");
-    expect(rule).toContain("東京タワー");
-    expect(rule).toContain("手書き");
-  });
-
-  test("omits nonce instruction when nonce is undefined", () => {
-    const rule = buildChallengeRule(undefined, "東京タワー");
-    expect(rule).toContain("東京タワー");
-    expect(rule).not.toContain("手書き");
-    expect(rule).toContain("撮影");
-  });
-
-  test("recommends a provenance-capable camera", () => {
-    expect(buildChallengeRule("X", "test")).toContain("来歴証明");
-    expect(buildChallengeRule(undefined, "test")).toContain("来歴証明");
   });
 });

@@ -6,7 +6,6 @@ import type {
   FrostSignaturePort,
   OracleRegistry,
   PreimageStore,
-  ProofDelivery,
 } from "./ports.ts";
 import { MIN_ESCROW_LOCKTIME_SECS } from "./query-escrow-validation.ts";
 import {
@@ -72,7 +71,6 @@ export interface QueryServiceDeps {
   /** FROST coordinator port — used for P2PK+FROST settlement on success. */
   frostSignature?: FrostSignaturePort;
   hooks?: QueryHooks;
-  proofDelivery?: ProofDelivery;
   /** Defaults to identity. */
   normalizeResult?: (result: QueryResult, requestUrl?: string) => QueryResult;
 }
@@ -136,7 +134,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
   const escrowProvider = deps?.escrowProvider;
   const frostSignature = deps?.frostSignature;
   const hooks = deps?.hooks;
-  const proofDelivery = deps?.proofDelivery;
 
   const oracleResolver = (
     oracleId: string | undefined,
@@ -152,7 +149,6 @@ export function createQueryService(deps?: QueryServiceDeps): QueryService {
     preimageStore,
     escrowProvider,
     frostSignature,
-    proofDelivery,
     normalizeResult,
   };
 

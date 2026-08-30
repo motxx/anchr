@@ -10,6 +10,7 @@ import {
 import { KIND_ORACLE_ANNOUNCEMENT } from "@anchr/protocol/nostr";
 import type { NostrIdentity } from "../../../identity.ts";
 import type { OracleInfo } from "../../../requests/domain/oracle-types.ts";
+import { ORACLE_ANNOUNCEMENT_VERSION } from "./versions.ts";
 
 function nowUnix(): number {
   return Math.floor(Date.now() / 1000);
@@ -45,6 +46,7 @@ export function buildOracleAnnouncementEvent(
   }
 
   const content = JSON.stringify({
+    version: ORACLE_ANNOUNCEMENT_VERSION,
     name: oracleInfo.name,
     ...(oracleInfo.endpoint !== undefined && { endpoint: oracleInfo.endpoint }),
     fee_ppm: oracleInfo.fee_ppm,

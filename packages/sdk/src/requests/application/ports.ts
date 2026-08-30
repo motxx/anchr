@@ -9,12 +9,7 @@
 
 import type { Oracle, OracleInfo } from "../domain/oracle-types.ts";
 import type { BlossomKeyMap } from "../../values.ts";
-import type {
-  OracleAttestationRecord,
-  ProofVisibility,
-  Query,
-  QueryResult,
-} from "../domain/types.ts";
+import type { Query, QueryResult } from "../domain/types.ts";
 
 // ── HTLC preimage release material ────────────────────────────────
 
@@ -114,22 +109,4 @@ export interface FrostSignaturePort {
     result: QueryResult,
     blossomKeys?: BlossomKeyMap,
   ): Promise<string[] | null>;
-}
-
-// ── Proof delivery (Nostr publish or customer-only DM) ───────────
-
-export interface ProofPublishResult {
-  event_id: string;
-  relays: string[];
-}
-
-export interface ProofDelivery {
-  /**
-   * Returns null if visibility is "customer_only" or if publishing is skipped.
-   */
-  publish(
-    query: Query,
-    attestation: OracleAttestationRecord,
-    visibility: ProofVisibility,
-  ): Promise<ProofPublishResult | null>;
 }

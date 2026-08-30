@@ -36,7 +36,7 @@ export function validateQueryInput(input: QueryInput): string | null {
     return "description must not be empty";
   }
   if (input.schema !== undefined && !isSchemaUri(input.schema)) {
-    return "schema must be a valid schema URI";
+    return "schema must be a valid Proof Schema URL";
   }
   return null;
 }
