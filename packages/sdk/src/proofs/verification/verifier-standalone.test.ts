@@ -24,7 +24,11 @@ import type { TlsnAttestation, TlsnRequirement } from "../tlsn-types.ts";
 import type { VerificationInput, VerificationRequirement } from "./contract.ts";
 import type { TlsnValidationResult } from "../mod.ts";
 import { makeQuery } from "../../testing/factories.ts";
-import { ProofSchema } from "../../schema.ts";
+import {
+  ProofSchema,
+  registerSchemaBundle,
+  unregisterSchemaBundle,
+} from "../../schema.ts";
 
 const now = Math.floor(Date.now() / 1000);
 
@@ -75,6 +79,27 @@ describe("verifyProof — standalone (no Query envelope)", () => {
     expect(verification.failures).toContain(
       "no media evidence provided — photos are required when photo-backed verification is enabled",
     );
+  });
+
+  test("fails closed when a registered Proof Schema has no verification checks", async () => {
+    const schema = "https://example.com/spec/proof/producer-only/v1";
+    unregisterSchemaBundle(schema);
+    const dispose = registerSchemaBundle({ uri: schema });
+
+    try {
+      const verification = await verifyProof(
+        { id: "req_no_checks", schema, factors: [] },
+        { attachments: [] },
+      );
+
+      expect(verification).toEqual({
+        passed: false,
+        checks: [],
+        failures: [`Proof Schema has no verification checks: ${schema}`],
+      });
+    } finally {
+      dispose();
+    }
   });
 
   test("rejects empty generic-media submission when schema_requirement requests photo proof", async () => {

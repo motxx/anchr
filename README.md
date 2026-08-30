@@ -11,7 +11,7 @@ redeem only after a trusted Oracle accepts the proof. It removes the pay-first /
 deliver-first deadlock for verifiable off-chain work.
 
 The public deliverables are `@anchr/sdk` for application developers and
-`@anchr/protocol` for interoperable wire contracts. Anchr is not a hosted
+`@anchr/protocol` for implementing the Anchr specifications. Anchr is not a hosted
 service; each app chooses its own relay, mint, oracle, and notary.
 
 It combines:
@@ -81,7 +81,7 @@ trustless. Production deployments must choose and monitor two trust roots:
   the requested location.
 - Pay someone to prove an account fact such as contribution count, karma, or
   account age without exposing the whole account.
-- Build application-specific proof flows behind your own schema URL and Oracle
+- Build application-specific proof flows behind your own Proof Schema URL and Oracle
   policy.
 
 ## Install
@@ -156,15 +156,15 @@ const { data, proof, providerPubkey } = await customer.request({
 ```
 
 For the full Customer, Provider, Oracle, payment, proof, and testing APIs, see
-[`packages/sdk/README.md`](packages/sdk/README.md). For wire contracts and
-schema identifiers, use `@anchr/protocol` and [`specs/`](specs/).
+[`packages/sdk/README.md`](packages/sdk/README.md). For protocol message formats and
+Proof Schema identifiers, use `@anchr/protocol` and [`specs/`](specs/).
 
 ## Repository Map
 
 | Area | Paths | Role |
 | --- | --- | --- |
 | SDK | [`packages/sdk/`](packages/sdk/) | Customer, Provider, Oracle, payment, proof, attachment, adapter, and testing helpers. |
-| Protocol | [`packages/protocol/`](packages/protocol/), [`specs/`](specs/) | Nostr wire events, Cashu settlement fields, schema identifiers, validators, and protocol types. |
+| Protocol | [`packages/protocol/`](packages/protocol/), [`specs/`](specs/) | Nostr events, Cashu settlement fields, Proof Schema identifiers, validators, and protocol types. |
 | Native helpers | [`crates/`](crates/) | Rust binaries used by FROST and TLSNotary tooling. |
 
 See [`docs/architecture.md`](docs/architecture.md) for package boundaries and
@@ -188,7 +188,7 @@ only `@anchr/sdk` or `@anchr/protocol` for Anchr imports.
 - [Documentation index](docs/README.md) - public docs and maintainer workflow
 - [Architecture](docs/architecture.md) - layer boundaries and design notes
 - [Threat model](docs/threat-model.md) - trust assumptions and mitigations
-- [Wire spec](specs/) - protocol shapes, event kinds, and payloads
+- [Protocol format specification](specs/) - message formats, event kinds, and payloads
 - [Contributing](CONTRIBUTING.md) - local stack and test commands
 
 ## License

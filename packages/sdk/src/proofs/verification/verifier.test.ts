@@ -13,7 +13,6 @@ function makeQuery(overrides: Partial<Query>): Query {
   return makeBaseQuery({
     id: "query_test",
     challenge_nonce: "K7P4",
-    challenge_rule: "include nonce",
     verification_requirements: ["nonce", "c2pa"],
     schema: ProofSchema.C2paImageV1,
     expires_at: Date.now() + 60_000,

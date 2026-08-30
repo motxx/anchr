@@ -1,14 +1,14 @@
 /**
- * In-process wiring tests — co-execute Customer + Provider + a fake
- * oracle against a fully mocked transport (in-memory relay) and a fully
- * mocked Cashu mint (stubbed CashuClient). They verify that the SDK's
+ * In-process Paid Request integration test — co-executes Customer + Provider +
+ * a fake oracle against a fully mocked transport (in-memory relay) and a fully
+ * mocked Cashu mint (stubbed CashuClient). It verifies that the SDK's
  * event builders/parsers and Customer/Provider state machines compose
  * correctly without touching any external infrastructure.
  *
  * What this file is NOT:
  *   - Not an end-to-end test against a real Nostr relay
  *   - Not an end-to-end test against a real Cashu mint
- *   - Not a verification that NUT-14 HTLC + NIP-44 actually work on the wire
+ *   - Not a verification that NUT-14 HTLC + NIP-44 work through a mint and relay
  *
  * The real e2e coverage lives at `e2e/regtest/sdk-integration.test.ts`
  * (run via `deno task test:e2e:regtest`), which exercises this same flow
@@ -138,7 +138,7 @@ function makeCashuClient(): CashuClient {
 
 // --- End-to-end test ---
 
-test("in-process wiring: customer.request returns the provider's data via a shared mock relay (no real mint, no real network)", async () => {
+test("in-process Paid Request returns the Provider's data through a shared mock relay (no real mint, no real network)", async () => {
   const relay = new MockRelay();
   const oracleKey = generateKeypair();
   const customerCashuClient = makeCashuClient();
