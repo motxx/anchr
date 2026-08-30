@@ -100,7 +100,7 @@ dependencies = [
  "hyper",
  "hyper-util",
  "k256",
- "rand 0.8.5",
+ "rand 0.8.6",
  "serde_json",
  "tlsn",
  "tokio",
@@ -280,7 +280,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "94893f1e0c6eeab764ade8dc4c0db24caf4fe7cbbaafc0eba0a9030f447b5185"
 dependencies = [
  "num-traits",
- "rand 0.8.5",
+ "rand 0.8.6",
 ]
 
 [[package]]
@@ -1664,7 +1664,7 @@ dependencies = [
  "bincode",
  "itybity 0.3.1",
  "once_cell",
- "rand 0.9.2",
+ "rand 0.9.5",
  "regex",
  "serde",
  "serde_arrays",
@@ -1741,7 +1741,7 @@ dependencies = [
  "itybity 0.3.1",
  "once_cell",
  "opaque-debug",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rand_chacha 0.9.0",
  "rand_core 0.6.4",
  "rand_core 0.9.5",
@@ -1763,8 +1763,8 @@ dependencies = [
  "mpz-core",
  "num-bigint",
  "opaque-debug",
- "rand 0.8.5",
- "rand 0.9.2",
+ "rand 0.8.6",
+ "rand 0.9.5",
  "serde",
  "thiserror 1.0.69",
  "typenum",
@@ -1787,7 +1787,7 @@ dependencies = [
  "mpz-ot",
  "mpz-vm-core",
  "opaque-debug",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rangeset",
  "serde",
  "serio",
@@ -1816,7 +1816,7 @@ dependencies = [
  "mpz-vm-core",
  "once_cell",
  "opaque-debug",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
  "rangeset",
@@ -1866,7 +1866,7 @@ dependencies = [
  "futures",
  "itybity 0.3.1",
  "mpz-core",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rangeset",
  "serde",
  "thiserror 1.0.69",
@@ -1885,7 +1885,7 @@ dependencies = [
  "mpz-fields",
  "mpz-ole-core",
  "mpz-ot",
- "rand 0.9.2",
+ "rand 0.9.5",
  "serio",
  "thiserror 1.0.69",
 ]
@@ -1901,7 +1901,7 @@ dependencies = [
  "mpz-core",
  "mpz-fields",
  "mpz-ot-core",
- "rand 0.9.2",
+ "rand 0.9.5",
  "serde",
  "thiserror 1.0.69",
 ]
@@ -1921,7 +1921,7 @@ dependencies = [
  "mpz-core",
  "mpz-ot-core",
  "opaque-debug",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
  "serio",
@@ -1950,7 +1950,7 @@ dependencies = [
  "mpz-common",
  "mpz-core",
  "opaque-debug",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
  "rayon",
@@ -1971,7 +1971,7 @@ dependencies = [
  "mpz-fields",
  "mpz-ole",
  "mpz-share-conversion-core",
- "rand 0.9.2",
+ "rand 0.9.5",
  "serio",
  "thiserror 1.0.69",
 ]
@@ -1985,7 +1985,7 @@ dependencies = [
  "mpz-core",
  "mpz-fields",
  "mpz-ole-core",
- "rand 0.9.2",
+ "rand 0.9.5",
  "serde",
  "thiserror 1.0.69",
 ]
@@ -2352,9 +2352,9 @@ checksum = "dc33ff2d4973d518d823d61aa239014831e521c75da58e3df4840d3f47749d09"
 
 [[package]]
 name = "rand"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34af8d1a0e25924bc5b7c43c079c942339d8f0a8b57c39049bef581b46327404"
+checksum = "5ca0ecfa931c29007047d1bc58e623ab12e5590e8c7cc53200d5202b69266d8a"
 dependencies = [
  "libc",
  "rand_chacha 0.3.1",
@@ -2363,9 +2363,9 @@ dependencies = [
 
 [[package]]
 name = "rand"
-version = "0.9.2"
+version = "0.9.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6db2770f06117d490610c7488547d543617b21bfa07796d7a12f6f1bd53850d1"
+checksum = "b9ef1d0d795eb7d84685bca4f72f3649f064e6641543d3a8c415898726a57b41"
 dependencies = [
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
@@ -2984,7 +2984,7 @@ dependencies = [
  "mpz-zk",
  "once_cell",
  "opaque-debug",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rangeset",
  "rustls-pki-types",
  "rustls-webpki",
@@ -3016,7 +3016,7 @@ dependencies = [
  "k256",
  "opaque-debug",
  "p256",
- "rand 0.9.2",
+ "rand 0.9.5",
  "serde",
  "thiserror 1.0.69",
  "tiny-keccak",
@@ -3046,7 +3046,7 @@ dependencies = [
  "blake3",
  "itybity 0.2.1",
  "opaque-debug",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rand_chacha 0.9.0",
  "rand_core 0.9.5",
  "rangeset",
@@ -3111,7 +3111,7 @@ dependencies = [
  "mpz-share-conversion",
  "mpz-vm-core",
  "p256",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rand06-compat",
  "serio",
  "thiserror 1.0.69",
@@ -3144,7 +3144,7 @@ dependencies = [
  "opaque-debug",
  "p256",
  "pin-project-lite",
- "rand 0.9.2",
+ "rand 0.9.5",
  "serde",
  "serio",
  "thiserror 1.0.69",
@@ -3170,7 +3170,7 @@ dependencies = [
  "nohash-hasher",
  "parking_lot",
  "pin-project",
- "rand 0.9.2",
+ "rand 0.9.5",
  "static_assertions",
  "web-time 1.1.0",
 ]
@@ -3198,7 +3198,7 @@ dependencies = [
  "hmac",
  "log",
  "p256",
- "rand 0.9.2",
+ "rand 0.9.5",
  "rand06-compat",
  "ring",
  "rustls-pki-types",
@@ -3230,7 +3230,7 @@ source = "git+https://github.com/tlsnotary/tlsn?tag=v0.1.0-alpha.14#9a3d73c5bdee
 dependencies = [
  "futures",
  "hmac",
- "rand 0.9.2",
+ "rand 0.9.5",
  "ring",
  "rustls-pemfile",
  "rustls-pki-types",
@@ -3371,7 +3371,7 @@ dependencies = [
  "httparse",
  "log",
  "native-tls",
- "rand 0.9.2",
+ "rand 0.9.5",
  "sha1",
  "thiserror 2.0.18",
  "utf-8",
