@@ -256,13 +256,13 @@ Provider/Oracle activity patterns. "Requests are unlinkable" claims in this
 repository always mean Customer-side unlinkability (INV-07), never the whole
 exchange.
 
-## Settlement Decision Rules
+## Redeem, Settlement Reporting, and Audit
 
-The normative redeem contract lives in
+The normative redeem requirements live in
 [`specs/paid-request-exchange.md#release-and-redeem`](../specs/paid-request-exchange.md#release-and-redeem).
-This threat model treats the settlement-decision separation as
-security-sensitive because collapsing Cashu spendability, clean settlement, and
-audit decisions can strand Provider funds or hide release anomalies.
+This threat model keeps redeem eligibility, clean-settlement reporting, and
+audit decisions separate. Combining them can strand Provider funds or hide
+release anomalies.
 
 The security claim is that mutable Provider policy, release-source mismatch,
 signature mismatch, `query_id` mismatch, `request_event_id` mismatch, stale

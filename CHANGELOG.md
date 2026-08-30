@@ -7,6 +7,8 @@ minor versions until the SDK API is declared stable.
 
 ## Unreleased
 
+- Moved the in-process Paid Request test into the integration tier so the unit
+  and integration tasks classify it consistently.
 - Removed unused SDK surface (pre-1.0 cleanup, issues 0228/0230): the `Query`
   fields `challenge_rule`, `published_proofs`, and `visibility` (with the
   `ProofVisibility` type), the unreachable `"submitted"` status,

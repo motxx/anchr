@@ -26,7 +26,7 @@ transcript data (`revealed_body`,
 to reveal to the Oracle becomes public and irreversible on Nostr relays. The
 threat model classifies this as the "Verdict content exposure" risk with
 "reveal only minimal transcript ranges" as the only mitigation. Decide the
-wire contract: keep `details` fully public (attestations are meant to be
+protocol message format: keep `details` fully public (attestations are meant to be
 publicly re-checkable), make verdict inclusion opt-in per query, or strip
 verdict payloads from the public event and deliver them customer-only next to
 the proof artifacts.
@@ -41,13 +41,13 @@ the proof artifacts.
   check the Oracle's signature and reproduce deterministic checks) — a
   decision to strip `details` must say what remains publicly checkable.
 - Wire-format change territory: kind 30103 payload shape is part of the
-  `@anchr/protocol` contract surface (`specs/`), so the decision may need a
+  `@anchr/protocol` message format (`specs/`), so the decision may need a
   spec edit, not only SDK changes.
 
 ## Acceptance
 
 - A decision is recorded (ADR if it meets the ADR bar, otherwise the spec or
-  threat model states the contract) for what the public `details` field may
+  threat model states the requirement) for what the public `details` field may
   contain.
 - Code, spec, and the threat-model "Attestation publication" section make the
   same claim about verdict visibility.
