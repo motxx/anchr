@@ -10,7 +10,7 @@ maintenance
 ## Dependencies
 
 Depends on:
-- 0234
+- None
 
 Blocks:
 - None
@@ -32,8 +32,7 @@ test fails loudly at the permission boundary.
 - CLAUDE.md test rules: unit tier = "No I/O".
 - 0216 covers gate-marker integrity and `deno task test` drift; it does not
   touch tier permissions. 0189 removes sleeps but not I/O capability.
-- Depends on 0234 so the in-process wiring test is out of the unit tier
-  before permissions tighten.
+- The in-process Paid Request test is already assigned to the integration tier.
 
 ## Acceptance
 
