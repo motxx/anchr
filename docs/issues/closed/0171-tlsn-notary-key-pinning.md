@@ -80,7 +80,7 @@ Verified with:
 - `cargo clippy --locked --all-targets --all-features` and `cargo test
   --locked` for all three TLSN crates — pass
 - `deno task test:all` — pass
-- `deno task test:all:docker` — pass, including TLSNotary E2E (7 steps)
+- `deno task test:all:docker` — pass, including TLSNotary E2E (9 steps)
 - `check-silent-bypass` — no findings in the two changed package source files
 - `security-max-audit` — no critical or warning findings
 
@@ -90,6 +90,10 @@ Harness update:
 - Added SDK coverage for missing pin rejection and sidecar pin propagation.
 - Added an INV-01 Docker E2E check for a valid presentation verified against a
   different configured notary key.
+- Added a Docker E2E check that runs the in-process prover twice and verifies
+  both presentations against the same configured public key.
+- Added a Docker E2E check that verifies the WebSocket prover signs with its
+  configured notary key.
 
 Review residuals:
 
