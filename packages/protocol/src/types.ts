@@ -1,8 +1,8 @@
 /** A specification of what the customer wants to buy. */
 export interface Spec {
-  /** Schema URL identifying the proof format and predicate shape. */
+  /** Proof Schema URL identifying the proof format and predicate shape. */
   schema: string;
-  /** Schema-specific predicate. The shape is defined by the schema document. */
+  /** Predicate whose shape is defined by the selected Proof Schema. */
   predicate: unknown;
   /** Optional human-readable / AI-agent-readable description of intent. */
   description?: string;
@@ -16,7 +16,7 @@ export interface Payment {
   maxAmount: number;
   /**
    * Refund-locktime duration in seconds from selection time (default: 3600).
-   * The wire field `locktime_seconds` carries the resulting absolute Unix
+   * The protocol field `locktime_seconds` carries the resulting absolute Unix
    * timestamp in seconds, computed when the Provider is selected.
    */
   locktimeSeconds?: number;
@@ -30,7 +30,7 @@ export interface RequestResult {
   proof: Uint8Array | string;
   /** Hex pubkey of the provider that fulfilled the request. */
   providerPubkey: string;
-  /** Schema URL under which the proof was produced. */
+  /** Proof Schema URL under which the proof was produced. */
   schema: string;
 }
 

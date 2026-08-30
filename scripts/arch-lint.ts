@@ -62,7 +62,7 @@ const APP_VOCAB =
   /\b(market|marketplace|markets|marketplaces|Market|Marketplace|Markets|Marketplaces|MARKET|MARKETPLACE|bounty|bounties|Bounty|Bounties|BOUNTY)\b/;
 // [E027] Nostr event-kind constants are owned by @anchr/protocol/nostr.
 // Defining a numeric kind constant in the sdk package re-creates a second
-// wire-contract owner.
+// owner of interoperable Nostr message formats.
 const SDK_KIND_CONST = /\bexport\s+const\s+(KIND_|ANCHR_)[A-Z_0-9]+\s*=\s*\d+/;
 // [E028] Direct env reads are confined to documented config-resolution
 // surfaces; library modules take config through options/deps instead.

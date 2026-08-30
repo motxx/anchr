@@ -13,7 +13,7 @@ export interface QuorumVerificationResult {
   verification: VerificationDetail;
 }
 
-/** Resolver callback — abstracts OracleRegistry / fallback singleton. */
+/** Resolver callback — abstracts an injected OracleRegistry. */
 export type OracleResolver = (
   oracleId: string | undefined,
   acceptableIds: string[] | undefined,

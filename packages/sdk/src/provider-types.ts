@@ -72,7 +72,7 @@ export interface ProviderOptions {
   oracleClients?: Record<string, OracleClient>;
   /** Optional local state adapter for browser, Node, Deno, or test persistence. */
   stateStore?: ActorStateStore;
-  /** Optional schema-specific configuration keyed by schema URI. */
+  /** Optional Proof Schema configuration keyed by Proof Schema URL. */
   schemaOptions?: SchemaOptionsMap;
   selectionTimeoutMs?: number;
   hashTimeoutMs?: number;

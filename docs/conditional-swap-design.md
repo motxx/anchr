@@ -2,7 +2,7 @@
 
 This document is retained design material for future N:M conditional
 settlement. It is not an active Anchr v0 protocol spec, not part of the current
-public `@anchr/protocol` wire contract, and not a public SDK surface.
+interoperable message format in `@anchr/protocol`, and not a public SDK API.
 
 The active v0 exchange is the Nostr-native, Cashu-settled paid-request flow in
 [`../specs/paid-request-exchange.md`](../specs/paid-request-exchange.md) and
