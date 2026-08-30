@@ -3,7 +3,6 @@ import type {
   EscrowProvider,
   FrostSignaturePort,
   PreimageStore,
-  ProofDelivery,
 } from "./ports.ts";
 import type {
   MultiOracleResolver,
@@ -19,7 +18,6 @@ export interface ServiceDeps {
   preimageStore?: PreimageStore;
   escrowProvider?: EscrowProvider;
   frostSignature?: FrostSignaturePort;
-  proofDelivery?: ProofDelivery;
   /** Normalize attachment refs in a QueryResult. Defaults to identity. */
   normalizeResult?: (result: QueryResult, requestUrl?: string) => QueryResult;
 }

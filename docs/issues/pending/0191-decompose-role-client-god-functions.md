@@ -23,7 +23,10 @@ bootstrap, publish, four state writes, offer windowing, offer selection,
 payment-lock binding, result wait, decrypt/parse, schema verification, and
 error decoration. `provider.ts` follows the same inline pattern. There is no
 seam to unit-test any stage in isolation, so a change to offer selection risks
-the payment path. The correct shape depends on the 0190 ownership decision.
+the payment path. The 0190 ownership decision is recorded in ADR 0003: the
+`requests/` aggregate owns the lifecycle, so the decomposition drives the
+facades through `requests/application` services and deletes the per-role
+status models.
 
 ## Rationale
 
@@ -45,8 +48,9 @@ the payment path. The correct shape depends on the 0190 ownership decision.
 ## Acceptance
 
 - The lifecycle is expressed as discrete, independently testable steps
-  (e.g. `collectOffers`, `bindPaymentLock`, `awaitAndVerifyResult`) — either by
-  reusing the `requests/` stages or by extracting named functions, per 0190.
+  (e.g. `collectOffers`, `bindPaymentLock`, `awaitAndVerifyResult`) by reusing
+  the `requests/` stages per ADR 0003; no per-role status model remains in
+  `customer.ts` / `provider.ts`.
 
 ## Verification
 
@@ -55,5 +59,7 @@ the payment path. The correct shape depends on the 0190 ownership decision.
 
 ## Plan
 
-- Apply the 0190 decision.
+- Apply ADR 0003: drive the facades through `requests/application` services.
 - Extract the Customer steps first, then mirror for Provider.
+- Shrink the arch-lint E026 importer whitelist as production importers of
+  `query-service.ts` become real.

@@ -51,7 +51,8 @@ block is duplicated verbatim.
   (quorum dispatch policy, `WatchedQuery` state, evidence mapping,
   hash-responder issuance) are either moved out of `adapters/nostr/` in this
   change or split into a linked follow-up issue before closing; the eviction
-  direction follows the 0190 ownership decision.
+  direction follows the 0190 ownership decision (ADR 0003: the `requests/`
+  aggregate owns the lifecycle).
 
 ## Verification
 

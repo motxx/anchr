@@ -20,7 +20,7 @@ Blocks:
 Several event parsers in `protocol/events.ts` re-implement the same
 `decryptNip44 → JSON.parse → typeof shape check` sequence, while a helper
 (`decryptDmJson`) already encapsulates it for only two of them. This is the
-wire-contract validation surface; inconsistent copies invite subtle validation
+validation of protocol messages; inconsistent copies invite subtle validation
 drift between message types.
 
 ## Rationale
