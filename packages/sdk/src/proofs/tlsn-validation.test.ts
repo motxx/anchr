@@ -26,6 +26,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+const NOTARY_PUBLIC_KEY =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
 // --- Helpers ---
 
 function makeAttestation(
@@ -170,10 +173,13 @@ describe("validateTlsn with mock binary", () => {
   beforeEach(() => _clearSeenPresentationsForTest());
 
   test("uses the injected executor for lookup and verifier execution", async () => {
-    const commands: string[][] = [];
+    const commands: Array<{
+      command: string[];
+      env: Record<string, string> | undefined;
+    }> = [];
     const executor: SidecarExecutor = {
-      spawn(cmd): SpawnResult {
-        commands.push(cmd);
+      spawn(command, options): SpawnResult {
+        commands.push({ command, env: options?.env });
         return {
           exited: Promise.resolve(),
           exitCode: 0,
@@ -199,11 +205,29 @@ describe("validateTlsn with mock binary", () => {
 
     const result = await validateTlsn(makeAttestation(), makeRequirement(), {
       executor,
+      notaryPublicKey: NOTARY_PUBLIC_KEY,
     });
 
     expect(result.signatureValid).toBe(true);
     expect(result.serverIdentityValid).toBe(true);
-    expect(commands[0]?.slice(0, 2)).toEqual(["/mock/tlsn-verifier", "verify"]);
+    expect(commands[0]?.command.slice(0, 2)).toEqual([
+      "/mock/tlsn-verifier",
+      "verify",
+    ]);
+    expect(commands[0]?.env).toEqual({
+      ANCHR_TLSN_NOTARY_PUBLIC_KEY_HEX: NOTARY_PUBLIC_KEY,
+    });
+  });
+
+  test("fails closed when the pinned notary key is not configured", async () => {
+    const result = await validateTlsn(makeAttestation(), makeRequirement(), {
+      verifierPath: mockVerifierPath,
+    });
+    expect(result.available).toBe(false);
+    expect(result.signatureValid).toBe(false);
+    expect(result.failures).toContain(
+      "TLSNotary: pinned notary public key not configured — cannot verify presentation",
+    );
   });
 
   test("valid presentation passes all checks", async () => {
@@ -222,7 +246,7 @@ describe("validateTlsn with mock binary", () => {
           description: "BTC price",
         }],
       }),
-      { verifierPath: mockVerifierPath },
+      { verifierPath: mockVerifierPath, notaryPublicKey: NOTARY_PUBLIC_KEY },
     );
 
     expect(result.signatureValid).toBe(true);
@@ -241,6 +265,7 @@ describe("validateTlsn with mock binary", () => {
 
     const result = await validateTlsn(makeAttestation(), makeRequirement(), {
       verifierPath: mockVerifierPath,
+      notaryPublicKey: NOTARY_PUBLIC_KEY,
     });
     expect(result.signatureValid).toBe(false);
     expect(result.failures.some((f) => f.includes("signature invalid"))).toBe(
@@ -257,6 +282,7 @@ describe("validateTlsn with mock binary", () => {
     });
     const result = await validateTlsn(makeAttestation(), makeRequirement(), {
       verifierPath: mockVerifierPath,
+      notaryPublicKey: NOTARY_PUBLIC_KEY,
     });
     expect(result.serverIdentityValid).toBe(false);
     expect(result.failures.some((f) => f.includes("does not match target")))
@@ -273,7 +299,7 @@ describe("validateTlsn with mock binary", () => {
     const result = await validateTlsn(
       makeAttestation(),
       makeRequirement({ max_attestation_age_seconds: 300 }),
-      { verifierPath: mockVerifierPath },
+      { verifierPath: mockVerifierPath, notaryPublicKey: NOTARY_PUBLIC_KEY },
     );
     expect(result.attestationFresh).toBe(false);
     expect(result.failures.some((f) => f.includes("too old"))).toBe(true);
@@ -287,6 +313,7 @@ describe("validateTlsn with mock binary", () => {
     });
     const result = await validateTlsn(makeAttestation(), makeRequirement(), {
       verifierPath: mockVerifierPath,
+      notaryPublicKey: NOTARY_PUBLIC_KEY,
     });
     expect(result.attestationFresh).toBe(false);
     expect(result.failures.some((f) => f.includes("no timestamp in proof")))
@@ -316,7 +343,7 @@ describe("validateTlsn with mock binary", () => {
           },
         ],
       }),
-      { verifierPath: mockVerifierPath },
+      { verifierPath: mockVerifierPath, notaryPublicKey: NOTARY_PUBLIC_KEY },
     );
 
     expect(result.conditionResults).toHaveLength(2);

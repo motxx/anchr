@@ -23,6 +23,7 @@ import type { CheckAccumulator, FactorCheck } from "./types.ts";
 export interface TlsnSchemaOptions {
   validateTlsn?: typeof validateTlsn;
   verifierPath?: string | null;
+  notaryPublicKey?: string;
   executor?: SidecarExecutor;
   notaryUrl?: string;
 }
@@ -54,6 +55,12 @@ function isTlsnSchemaOptions(value: unknown): value is TlsnSchemaOptions {
   if (
     record.executor !== undefined &&
     !isSidecarExecutor(record.executor)
+  ) {
+    return false;
+  }
+  if (
+    record.notaryPublicKey !== undefined &&
+    typeof record.notaryPublicKey !== "string"
   ) {
     return false;
   }
@@ -170,7 +177,11 @@ export function createTlsnCheck(
         ctx.input,
         ctx.acc,
         options.validateTlsn ?? validateTlsn,
-        { verifierPath: options.verifierPath, executor: options.executor },
+        {
+          verifierPath: options.verifierPath,
+          notaryPublicKey: options.notaryPublicKey,
+          executor: options.executor,
+        },
       );
     },
   };

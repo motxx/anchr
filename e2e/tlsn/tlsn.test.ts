@@ -47,6 +47,10 @@ const PRESENTATION_PATH = "/tmp/e2e-tlsn.presentation.tlsn";
 const MUTATED_PRESENTATION_PATH = "/tmp/e2e-tlsn-mutated.presentation.tlsn";
 const PROVER_ATTEMPTS = 3;
 const TLSN_E2E_ORACLE_ID = "tlsn-e2e-oracle";
+const TEST_NOTARY_PUBLIC_KEY =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+const OTHER_NOTARY_PUBLIC_KEY =
+  "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 
 let filePresentationPromise: Promise<string> | undefined;
 
@@ -69,6 +73,13 @@ function createTlsnE2eOracle(): Oracle {
         {
           attachments: result.attachments,
           schema_evidence: result.schema_evidence,
+        },
+        {
+          schemaOptions: {
+            [ProofSchema.TlsnV1]: {
+              notaryPublicKey: TEST_NOTARY_PUBLIC_KEY,
+            },
+          },
         },
       );
 
@@ -178,10 +189,12 @@ function getFilePresentation(): Promise<string> {
 
 async function verifyPresentation(
   path: string,
+  notaryPublicKey = TEST_NOTARY_PUBLIC_KEY,
 ): Promise<Record<string, unknown>> {
   const proc = spawn([VERIFIER_BIN, "verify", path], {
     stdout: "pipe",
     stderr: "pipe",
+    env: { ANCHR_TLSN_NOTARY_PUBLIC_KEY_HEX: notaryPublicKey },
   });
   await proc.exited;
   const stdout = await new Response(proc.stdout).text();
@@ -248,6 +261,21 @@ describe("TLSNotary E2E", () => {
     expect(result.server_name).toBe(TARGET_SERVER);
     expect(typeof result.revealed_body).toBe("string");
     expect(result.revealed_body as string).toContain(TARGET_BODY_MARKER);
+  });
+
+  test("INV-01: rejects a presentation signed by a non-pinned notary", async () => {
+    if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
+      console.error("[e2e] SKIPPED — infrastructure not ready");
+      return;
+    }
+
+    await getFilePresentation();
+    const result = await verifyPresentation(
+      PRESENTATION_PATH,
+      OTHER_NOTARY_PUBLIC_KEY,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Notary key mismatch");
   });
 
   // INV-01
