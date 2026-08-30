@@ -19,7 +19,7 @@ them only after the work is implemented and verified.
 
 ## Workflow
 
-1. Read `CLAUDE.md`, `docs/issues/README.md`, and the target issue file.
+1. Read `AGENTS.md`, `docs/issues/README.md`, and the target issue file.
 2. Determine the target:
    - A named issue number or path → that issue.
    - "next issue" → the lowest-numbered pending issue whose `Depends on`
@@ -45,7 +45,7 @@ them only after the work is implemented and verified.
      is purely a tracking issue whose resolution is the split itself. Do
      not implement a broad parent and its children in one change.
 7. Implement the smallest coherent change that satisfies the issue,
-   following the repository conventions in `CLAUDE.md`. Preserve unrelated
+   following the repository conventions in `AGENTS.md`. Preserve unrelated
    user edits.
 8. Add or update tests when the change affects behavior. Docs-only changes
    are acceptable only for explicitly documentation/design issues.
@@ -55,7 +55,7 @@ them only after the work is implemented and verified.
      closing — it catches unresolved imports, stale export names, and type
      errors that focused tests miss. Treat failures as blockers, not
      residual cleanup.
-   - Run the full local bar from `CLAUDE.md` (`deno task test:all`) before
+   - Run the full local bar from `AGENTS.md` (`deno task test:all`) before
      closing. Do not call the issue resolved while required checks fail or
      are skipped without a clear blocker.
    - If the change touches verification, validation, settlement,
@@ -85,7 +85,7 @@ them only after the work is implemented and verified.
 - For design issues, update the relevant docs/specs and lock newly
   concrete behavior with tests when practical.
 - No compatibility shims, deprecated paths, `any`, broad casts,
-  `console.*` in packages, or history comments (see `CLAUDE.md`).
+  `console.*` in packages, or history comments (see `AGENTS.md`).
 - If the work reveals a separate task, create a new pending issue with a
   fresh number via `skills/make-issues/SKILL.md` instead of stretching the
   current one.

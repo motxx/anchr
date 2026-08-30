@@ -29,7 +29,7 @@ implementation.
 ## Rationale
 
 - CI log: `✓ type-safety lint passed (errors=0, warnings=251)`.
-- CLAUDE.md type bar: predicates over casts; justified casts only at parser
+- AGENTS.md type bar: predicates over casts; justified casts only at parser
   boundaries.
 - Security-relevant cast sites should be prioritised (payment, verification,
   protocol parsing paths).
