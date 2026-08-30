@@ -9,7 +9,7 @@ Run `deno task lint:arch --errors-only` first. Stop if it fails; static lint own
 
 Read each relevant non-test file in full, plus the modules that share or should own its responsibility. If the user gives no scope, review changed `packages/*/src/**/*.ts(x)` files from `origin/main...HEAD` that have at least 150 lines.
 
-Apply the single-purpose rule from `CLAUDE.md`: every function, module, package, adapter, and public surface has one owner responsibility.
+Apply the single-purpose rule from `AGENTS.md`: every function, module, package, adapter, and public surface has one owner responsibility.
 
 Report only findings supported by concrete code:
 

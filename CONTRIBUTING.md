@@ -82,17 +82,8 @@ Run the local script before pushing.
 
 ## Quality bar
 
-Enforced by lint and CI; full detail in [`CLAUDE.md`](CLAUDE.md).
-
-- Full TypeScript strict; no `--no-check` anywhere in test tasks.
-- No `as` casts or `any` in `src/` or `packages/`. `unknown` only at
-  HTTP / JSON boundaries with a `// type-lint-allow:` reason.
-- Architecture lint enforces a single shared root (`core-runtime`); no
-  other inter-package dependencies (`deno task lint:arch`).
-- Every threat-model invariant must have a test
-  (`deno task lint:invariants`).
-- `console.*` in non-UI code routes through logTape via
-  `@anchr/core-runtime/logger`.
+Lint and CI enforce the mechanical checks. Coding-agent rules that require
+judgment live in [`AGENTS.md`](AGENTS.md).
 
 ## Local infrastructure
 
