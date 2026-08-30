@@ -10,7 +10,7 @@
  * because they're erased at compile time, but they still defeat grep,
  * codemods, and rename-tracking the same way runtime ones do.
  *
- * The CLAUDE.md policy is: no `import("...")` call expressions in source
+ * The AGENTS.md policy is: no `import("...")` call expressions in source
  * — every legitimate platform conditional or script-mode entry must
  * explain itself via a `// allow-dynamic-import: <reason>` comment on
  * the same line. For type usage, lift to a top-of-file

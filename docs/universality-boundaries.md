@@ -17,7 +17,7 @@ Use the narrowest class that can hold the decision.
 | Package API or behavior | An API, algorithm, port, error model, or test expectation defined by one package and called by others, but not exchanged between independent implementations. | The package `SPEC.md`, README, and colocated tests |
 | Adapter or runtime integration | A binding to a concrete runtime, protocol bridge, CLI, HTTP gateway, MCP server, mobile bridge, browser API, hosted service, or operator workflow. | Adapter package docs or `examples/<name>/` when the surface is a tiny SDK/protocol lesson |
 | Example policy | A demo, deployment, mint/relay/oracle choice, pricing rule, or other concrete-example decision. | The owning `examples/<name>/` |
-| Agent harness rule | A rule about how coding agents, review skills, lints, issue templates, or verification commands keep the repository healthy. | `CLAUDE.md`, `AGENTS.md`, `skills/`, `scripts/`, or `docs/issues/README.md` |
+| Agent harness rule | A rule about how coding agents, review skills, lints, issue templates, or verification commands keep the repository healthy. | `AGENTS.md`, `skills/`, `scripts/`, or `docs/issues/README.md` |
 
 If a decision fits more than one row, put the normative statement in the
 highest row that truly needs it, then link to it from the lower-level document.
@@ -99,7 +99,7 @@ The current pending issues should use these boundaries as follows:
   adapter or primitive-package decisions unless a rule is required for
   compatible Anchr actors to interoperate. Nostr and Cashu are fixed v0
   substrates unless a new versioned protocol decision changes that.
-- Harness and human-review issues should modify `CLAUDE.md`, `skills/`,
+- Harness and human-review issues should modify `AGENTS.md`, `skills/`,
   `scripts/`, or `docs/issues/README.md` when they define repository process,
   and should link back to this document when they classify a review point as a
   human universal decision.
