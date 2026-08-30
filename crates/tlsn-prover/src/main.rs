@@ -6,7 +6,7 @@
 
 use std::path::PathBuf;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use http_body_util::Empty;
 use hyper::{body::Bytes, Request};
@@ -37,6 +37,33 @@ use tlsn::{
     verifier::VerifierOutput,
     Session,
 };
+
+const NOTARY_PRIVATE_KEY_ENV: &str = "ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX";
+
+fn load_notary_signing_key() -> Result<k256::ecdsa::SigningKey> {
+    let encoded = std::env::var(NOTARY_PRIVATE_KEY_ENV)
+        .with_context(|| {
+            format!("{NOTARY_PRIVATE_KEY_ENV} must contain the persistent notary private key")
+        })?;
+    let bytes = hex::decode(encoded.trim())
+        .with_context(|| format!("{NOTARY_PRIVATE_KEY_ENV} must be hex encoded"))?;
+    let signing_key = k256::ecdsa::SigningKey::from_slice(&bytes)
+        .with_context(|| {
+            format!("{NOTARY_PRIVATE_KEY_ENV} must encode a valid secp256k1 private key")
+        })?;
+    eprintln!(
+        "[tlsn-prove] Notary public key: {}",
+        hex::encode(signing_key.verifying_key().to_sec1_bytes())
+    );
+    Ok(signing_key)
+}
+
+fn notary_crypto_provider(signing_key: &k256::ecdsa::SigningKey) -> Result<CryptoProvider> {
+    let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
+    let mut provider = CryptoProvider::default();
+    provider.signer.set_signer(signer);
+    Ok(provider)
+}
 
 #[derive(Parser)]
 #[command(name = "tlsn-prove", about = "Generate a TLSNotary presentation for a URL")]
@@ -123,14 +150,16 @@ async fn main() -> Result<()> {
     let (attestation, secrets) = if let Some(ref verifier_addr) = cli.verifier {
         if verifier_addr.starts_with("wss://") || verifier_addr.starts_with("ws://") {
             eprintln!("[tlsn-prove] Using WebSocket verifier: {}", verifier_addr);
-            run_with_ws_verifier(verifier_addr, &host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
+            let notary_signing_key = load_notary_signing_key()?;
+            run_with_ws_verifier(verifier_addr, &host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv, &notary_signing_key).await?
         } else {
             eprintln!("[tlsn-prove] Using TCP verifier: {}", verifier_addr);
             run_with_remote_verifier(verifier_addr, &host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
         }
     } else {
         eprintln!("[tlsn-prove] Using in-process verifier");
-        run_with_local_verifier(&host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv).await?
+        let notary_signing_key = load_notary_signing_key()?;
+        run_with_local_verifier(&host, port, &path, socks_proxy, &custom_headers, max_sent, max_recv, &notary_signing_key).await?
     };
 
     let presentation = build_presentation(attestation, secrets, &cli.redact_sent_headers)?;
@@ -150,6 +179,9 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+// Every prover transport takes the same flat target/MPC-limit parameter
+// list; collapsing it into a struct would only relocate the verbosity.
+#[allow(clippy::too_many_arguments)]
 async fn run_with_local_verifier(
     host: &str,
     port: u16,
@@ -158,14 +190,16 @@ async fn run_with_local_verifier(
     custom_headers: &[(String, String)],
     max_sent_data: usize,
     max_recv_data: usize,
+    notary_signing_key: &k256::ecdsa::SigningKey,
 ) -> Result<(Attestation, Secrets)> {
     let (verifier_socket, prover_socket) = tokio::io::duplex(1 << 23);
     let (request_tx, request_rx) = oneshot::channel::<AttestationRequest>();
     let (attestation_tx, attestation_rx) = oneshot::channel::<Attestation>();
 
     let host_clone = host.to_string();
+    let notary_signing_key = notary_signing_key.clone();
     tokio::spawn(async move {
-        if let Err(e) = run_verifier(verifier_socket, request_rx, attestation_tx, &host_clone).await {
+        if let Err(e) = run_verifier(verifier_socket, request_rx, attestation_tx, &host_clone, &notary_signing_key).await {
             eprintln!("[tlsn-prove] Verifier error: {e:#}");
         }
     });
@@ -173,8 +207,6 @@ async fn run_with_local_verifier(
     run_prover(prover_socket, request_tx, attestation_rx, host, port, path, socks_proxy, custom_headers, max_sent_data, max_recv_data).await
 }
 
-// Every prover transport takes the same flat target/MPC-limit parameter
-// list; collapsing it into a struct would only relocate the verbosity.
 #[allow(clippy::too_many_arguments)]
 async fn run_with_ws_verifier(
     verifier_url: &str,
@@ -185,6 +217,7 @@ async fn run_with_ws_verifier(
     custom_headers: &[(String, String)],
     max_sent_data: usize,
     max_recv_data: usize,
+    notary_signing_key: &k256::ecdsa::SigningKey,
 ) -> Result<(Attestation, Secrets)> {
     use async_tungstenite::tokio::connect_async;
     use async_tungstenite::tungstenite::Message;
@@ -246,7 +279,7 @@ async fn run_with_ws_verifier(
 
     let (attestation, secrets) = if has_verifier_data {
         eprintln!("[tlsn-prove] Building attestation from server-provided verifier data");
-        build_attestation_from_server_data(prover_output, &resp_json)?
+        build_attestation_from_server_data(prover_output, &resp_json, notary_signing_key)?
     } else {
         return Err(anyhow!("Server did not return verifier data. Use a self-hosted Verifier Server."));
     };
@@ -260,6 +293,7 @@ async fn run_with_ws_verifier(
 fn build_attestation_from_server_data(
     output: ProverMpcOutput,
     resp: &serde_json::Value,
+    notary_signing_key: &k256::ecdsa::SigningKey,
 ) -> Result<(Attestation, Secrets)> {
     let conn_info_bytes = base64_decode(resp["connectionInfo"].as_str().unwrap_or(""))?;
     let eph_key_bytes = base64_decode(resp["serverEphemeralKey"].as_str().unwrap_or(""))?;
@@ -269,10 +303,7 @@ fn build_attestation_from_server_data(
     let server_ephemeral_key = bincode::deserialize(&eph_key_bytes)?;
     let transcript_commitments = bincode::deserialize(&commitments_bytes)?;
 
-    let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
-    let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
-    let mut provider = CryptoProvider::default();
-    provider.signer.set_signer(signer);
+    let provider = notary_crypto_provider(notary_signing_key)?;
 
     let att_config = AttestationConfig::builder()
         .supported_signature_algs(Vec::from_iter(provider.signer.supported_algs()))
@@ -777,6 +808,7 @@ async fn run_verifier<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
     request_rx: oneshot::Receiver<AttestationRequest>,
     attestation_tx: oneshot::Sender<Attestation>,
     _host: &str,
+    notary_signing_key: &k256::ecdsa::SigningKey,
 ) -> Result<()> {
     let session = Session::new(socket.compat());
     let (driver, mut handle) = session.split();
@@ -821,10 +853,7 @@ async fn run_verifier<S: AsyncWrite + AsyncRead + Send + Sync + Unpin + 'static>
 
     let request = request_rx.await?;
 
-    let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
-    let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
-    let mut provider = CryptoProvider::default();
-    provider.signer.set_signer(signer);
+    let provider = notary_crypto_provider(notary_signing_key)?;
 
     let att_config = AttestationConfig::builder()
         .supported_signature_algs(Vec::from_iter(provider.signer.supported_algs()))

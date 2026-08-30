@@ -28,6 +28,9 @@ services:
     ports:
       - "${ANCHR_TLSN_TCP_PORT:-7046}:7046"
       - "${ANCHR_TLSN_WS_PORT:-7047}:7047"
+    environment:
+      # Well-known secp256k1 test key (scalar 1), for local E2E only.
+      ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX: ${ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX:-0000000000000000000000000000000000000000000000000000000000000001}
 
   # --- Lightning regtest stack ---
 

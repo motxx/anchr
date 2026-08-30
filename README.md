@@ -96,6 +96,27 @@ You also need deployment-owned infrastructure: a Cashu mint URL, Nostr relay
 URL, oracle pubkey, and Provider Nostr secret key. TLSNotary-based schemas
 also need a notary.
 
+TLSNotary notaries must set `ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX` to one
+persistent secp256k1 private key. `tlsn-server` prints the corresponding
+compressed public key at startup. Configure that public key on every Oracle:
+
+```ts
+import { ProofSchema } from "@anchr/sdk";
+
+const verificationOptions = {
+  schemaOptions: {
+    [ProofSchema.TlsnV1]: {
+      notaryPublicKey: "<compressed secp256k1 public key as hex>",
+    },
+  },
+};
+```
+
+The SDK passes the pin to `tlsn-verifier`; missing or mismatched pins fail
+verification. Local in-process or WebSocket prover modes also require
+`ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX` because those modes sign the attestation
+inside `tlsn-prove`.
+
 ## Quick Start
 
 From a clean checkout (with [Deno](https://deno.com/) installed), publish a

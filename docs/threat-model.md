@@ -31,20 +31,24 @@ can't silently weaken an invariant without a PR reviewer seeing the hash bump.
 **Status:** `enforced`
 
 **Claim:** The Oracle's TLSN verifier rejects any presentation whose transcript,
-notary signature, or MPC-TLS MAC chain is invalid. A Provider cannot produce a
-presentation for an HTTPS response they did not actually observe.
+notary signature, or MPC-TLS MAC chain is invalid, or whose signing key is not
+the configured notary key. A Provider cannot substitute its own notary or
+produce a presentation for an HTTPS response it did not actually observe.
 
 **Attack:** Generate a valid TLSN presentation, mutate a byte in the transcript
-commitment / notary signature / target-host field, submit to the Oracle's
-verifier.
+commitment / notary signature / target-host field or sign it with an untrusted
+notary key, then submit it to the Oracle's verifier.
 
 **Expected:** Verifier returns a typed error (`VerifierError::Transcript`,
-`::Signature`, or `::Server` per mutation class). Oracle does NOT release the
-preimage. Oracle does NOT emit a FROST signature share.
+`::Signature`, or `::Server` per mutation class) or a distinct notary-key
+mismatch. Oracle does NOT release the preimage. Oracle does NOT emit a FROST
+signature share.
 
 **Tests:**
 
 - `e2e/tlsn/tlsn.test.ts` — `INV-01: rejects a mutated TLSNotary presentation`.
+- `e2e/tlsn/tlsn.test.ts` — `INV-01: rejects a presentation signed by a
+  non-pinned notary`.
 
 ### INV-02: Oracle wrapper does not release preimage when verification fails
 

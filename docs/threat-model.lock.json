@@ -1,7 +1,7 @@
 {
   "INV-01": {
-    "hash": "sha256:7d4ea42cd463db5f987b72af6972fd454d1771178c4b134554966d978076111a",
-    "justification": "rename actor wording to Provider without changing the TLSN proof-forgery invariant"
+    "hash": "sha256:fe9dcf8ecae14212c22ce4f3148e1678e60725db256f0ea05195903ea5123611",
+    "justification": "extend TLSN anti-forgery to require the configured notary key and lock the non-pinned-key rejection test"
   },
   "INV-02": {
     "hash": "sha256:903edf3abdcd789477bcc4f67359d6ed547ca0d01b3f18cfd4bb6c0955f7e82d",

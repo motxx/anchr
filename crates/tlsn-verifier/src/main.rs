@@ -3,6 +3,30 @@ use clap::{Parser, Subcommand};
 use serde_json::json;
 use std::path::PathBuf;
 use tlsn_attestation::presentation::{Presentation, PresentationOutput};
+use tlsn_attestation::signing::{KeyAlgId, VerifyingKey};
+
+const NOTARY_PUBLIC_KEY_ENV: &str = "ANCHR_TLSN_NOTARY_PUBLIC_KEY_HEX";
+
+fn parse_pinned_notary_key(encoded: &str) -> Result<Vec<u8>> {
+    let bytes = hex::decode(encoded.trim())
+        .with_context(|| format!("{NOTARY_PUBLIC_KEY_ENV} must be hex encoded"))?;
+    let key = k256::ecdsa::VerifyingKey::from_sec1_bytes(&bytes)
+        .with_context(|| format!("{NOTARY_PUBLIC_KEY_ENV} must encode a valid secp256k1 public key"))?;
+    Ok(key.to_encoded_point(true).as_bytes().to_vec())
+}
+
+fn load_pinned_notary_key() -> Result<Vec<u8>> {
+    let encoded = std::env::var(NOTARY_PUBLIC_KEY_ENV)
+        .with_context(|| format!("{NOTARY_PUBLIC_KEY_ENV} must contain the pinned notary public key"))?;
+    parse_pinned_notary_key(&encoded)
+}
+
+fn ensure_pinned_notary_key(actual: &VerifyingKey, expected: &[u8]) -> Result<()> {
+    if actual.alg != KeyAlgId::K256 || actual.data != expected {
+        anyhow::bail!("Notary key mismatch: presentation was not signed by the configured notary");
+    }
+    Ok(())
+}
 
 #[derive(Parser)]
 #[command(name = "tlsn-verifier", about = "Verify TLSNotary presentation files")]
@@ -51,6 +75,9 @@ fn verify_presentation(path: &PathBuf) -> Result<serde_json::Value> {
 
     let presentation: Presentation = bincode::deserialize(&bytes)
         .context("Failed to deserialize presentation (expected bincode format)")?;
+
+    let pinned_notary_key = load_pinned_notary_key()?;
+    ensure_pinned_notary_key(presentation.verifying_key(), &pinned_notary_key)?;
 
     let provider = tlsn_attestation::CryptoProvider::default();
 
@@ -162,4 +189,36 @@ fn decode_chunked_body(raw: &str) -> Option<String> {
     }
 
     Some(result)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const PINNED_KEY: &str =
+        "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+    const OTHER_KEY: &str =
+        "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
+    fn attestation_key(encoded: &str) -> VerifyingKey {
+        VerifyingKey {
+            alg: KeyAlgId::K256,
+            data: parse_pinned_notary_key(encoded).expect("test key is valid"),
+        }
+    }
+
+    #[test]
+    fn accepts_the_pinned_notary_key() {
+        let expected = parse_pinned_notary_key(PINNED_KEY).expect("test key is valid");
+        ensure_pinned_notary_key(&attestation_key(PINNED_KEY), &expected)
+            .expect("pinned key must be accepted");
+    }
+
+    #[test]
+    fn rejects_a_non_pinned_notary_key_with_a_distinct_error() {
+        let expected = parse_pinned_notary_key(PINNED_KEY).expect("test key is valid");
+        let error = ensure_pinned_notary_key(&attestation_key(OTHER_KEY), &expected)
+            .expect_err("another notary key must be rejected");
+        assert!(error.to_string().contains("Notary key mismatch"));
+    }
 }

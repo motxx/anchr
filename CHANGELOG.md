@@ -7,6 +7,8 @@ minor versions until the SDK API is declared stable.
 
 ## Unreleased
 
+- Pinned TLSNotary presentations to a configured persistent notary key so an
+  untrusted prover cannot substitute its own self-consistent signing key.
 - Moved the in-process Paid Request test into the integration tier so the unit
   and integration tasks classify it consistently.
 - Removed unused SDK surface (pre-1.0 cleanup, issues 0228/0230): the `Query`

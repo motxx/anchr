@@ -118,6 +118,8 @@ export interface ValidateTlsnOptions {
    * "unavailable". Defaults to auto-detection when omitted.
    */
   verifierPath?: string | null;
+  /** Compressed SEC1 public key of the trusted TLSNotary notary, as hex. */
+  notaryPublicKey?: string;
   executor?: SidecarExecutor;
 }
 
@@ -259,10 +261,27 @@ export async function validateTlsn(
     };
   }
 
+  const notaryPublicKey = options?.notaryPublicKey?.trim();
+  if (!notaryPublicKey) {
+    failures.push(
+      "TLSNotary: pinned notary public key not configured — cannot verify presentation",
+    );
+    return {
+      available: false,
+      signatureValid: false,
+      serverIdentityValid: false,
+      conditionResults: [],
+      attestationFresh: false,
+      checks,
+      failures,
+    };
+  }
+
   // --- Cryptographic verification ---
   const cryptoResult = await runVerifierBinary(
     verifierPath,
     attestation,
+    notaryPublicKey,
     executor,
   );
   if (!cryptoResult.signatureValid) {
@@ -379,6 +398,7 @@ interface VerifierBinaryResult {
 async function runVerifierBinary(
   verifierPath: string,
   attestation: TlsnAttestation,
+  notaryPublicKey: string,
   executor: SidecarExecutor,
 ): Promise<VerifierBinaryResult> {
   const tempDir = await mkdtemp(join(tmpdir(), "anchr-tlsn-"));
@@ -391,6 +411,7 @@ async function runVerifierBinary(
     const proc = executor.spawn([verifierPath, "verify", presentationPath], {
       stdout: "pipe",
       stderr: "pipe",
+      env: { ANCHR_TLSN_NOTARY_PUBLIC_KEY_HEX: notaryPublicKey },
     });
 
     const timeoutMs = VERIFIER_TIMEOUT_SECONDS * 1000;

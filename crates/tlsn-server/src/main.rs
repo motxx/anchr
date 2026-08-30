@@ -9,7 +9,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use clap::Parser;
 use futures::{SinkExt, StreamExt};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -30,6 +30,28 @@ use tlsn::{
     webpki::RootCertStore,
     Session,
 };
+
+const NOTARY_PRIVATE_KEY_ENV: &str = "ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX";
+
+fn load_notary_signing_key() -> Result<k256::ecdsa::SigningKey> {
+    let encoded = std::env::var(NOTARY_PRIVATE_KEY_ENV)
+        .with_context(|| {
+            format!("{NOTARY_PRIVATE_KEY_ENV} must contain the persistent notary private key")
+        })?;
+    let bytes = hex::decode(encoded.trim())
+        .with_context(|| format!("{NOTARY_PRIVATE_KEY_ENV} must be hex encoded"))?;
+    k256::ecdsa::SigningKey::from_slice(&bytes)
+        .with_context(|| {
+            format!("{NOTARY_PRIVATE_KEY_ENV} must encode a valid secp256k1 private key")
+        })
+}
+
+fn notary_crypto_provider(signing_key: &k256::ecdsa::SigningKey) -> Result<CryptoProvider> {
+    let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
+    let mut provider = CryptoProvider::default();
+    provider.signer.set_signer(signer);
+    Ok(provider)
+}
 
 #[derive(Parser)]
 #[command(name = "tlsn-server", about = "TLSNotary Verifier Server")]
@@ -60,15 +82,22 @@ struct AppState {
     tcp_sessions: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
     ws_sessions: Arc<Mutex<HashSet<String>>>,
     ws_results: Arc<Mutex<HashMap<String, oneshot::Sender<WsVerificationResult>>>>,
+    notary_signing_key: Arc<k256::ecdsa::SigningKey>,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
+    let notary_signing_key = Arc::new(load_notary_signing_key()?);
+    eprintln!(
+        "[tlsn-server] Notary public key: {}",
+        hex::encode(notary_signing_key.verifying_key().to_sec1_bytes())
+    );
     let state = AppState {
         tcp_sessions: Arc::new(Mutex::new(HashMap::new())),
         ws_sessions: Arc::new(Mutex::new(HashSet::new())),
         ws_results: Arc::new(Mutex::new(HashMap::new())),
+        notary_signing_key,
     };
 
     let tcp_state = state.clone();
@@ -478,15 +507,20 @@ async fn run_tcp_server(port: u16, state: AppState) -> Result<()> {
     loop {
         let (tcp, addr) = listener.accept().await?;
         let store = state.tcp_sessions.clone();
+        let notary_signing_key = state.notary_signing_key.clone();
         tokio::spawn(async move {
-            if let Err(e) = handle_tcp(tcp, store).await {
+            if let Err(e) = handle_tcp(tcp, store, notary_signing_key).await {
                 eprintln!("[tlsn-server] TCP error ({}): {:#}", addr, e);
             }
         });
     }
 }
 
-async fn handle_tcp(mut tcp: tokio::net::TcpStream, store: Arc<Mutex<HashMap<[u8; 16], SessionState>>>) -> Result<()> {
+async fn handle_tcp(
+    mut tcp: tokio::net::TcpStream,
+    store: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
+    notary_signing_key: Arc<k256::ecdsa::SigningKey>,
+) -> Result<()> {
     let mut cmd = [0u8; 1];
     tcp.read_exact(&mut cmd).await?;
     let mut sid = [0u8; 16];
@@ -501,7 +535,7 @@ async fn handle_tcp(mut tcp: tokio::net::TcpStream, store: Arc<Mutex<HashMap<[u8
         }
         b'A' => {
             eprintln!("[tlsn-server] TCP attest {}", sid_hex);
-            handle_tcp_attest(tcp, sid, store).await?;
+            handle_tcp_attest(tcp, sid, store, &notary_signing_key).await?;
             eprintln!("[tlsn-server] TCP attest {} signed", sid_hex);
         }
         _ => return Err(anyhow!("Unknown command: {}", cmd[0])),
@@ -536,7 +570,12 @@ async fn handle_tcp_mpc(tcp: tokio::net::TcpStream, sid: [u8; 16], store: Arc<Mu
     Ok(())
 }
 
-async fn handle_tcp_attest(mut tcp: tokio::net::TcpStream, sid: [u8; 16], store: Arc<Mutex<HashMap<[u8; 16], SessionState>>>) -> Result<()> {
+async fn handle_tcp_attest(
+    mut tcp: tokio::net::TcpStream,
+    sid: [u8; 16],
+    store: Arc<Mutex<HashMap<[u8; 16], SessionState>>>,
+    notary_signing_key: &k256::ecdsa::SigningKey,
+) -> Result<()> {
     let mut len_buf = [0u8; 4];
     tcp.read_exact(&mut len_buf).await?;
     let req_len = u32::from_be_bytes(len_buf) as usize;
@@ -555,10 +594,7 @@ async fn handle_tcp_attest(mut tcp: tokio::net::TcpStream, sid: [u8; 16], store:
         }
     };
 
-    let signing_key = k256::ecdsa::SigningKey::random(&mut rand::thread_rng());
-    let signer = Box::new(Secp256k1Signer::new(&signing_key.to_bytes())?);
-    let mut provider = CryptoProvider::default();
-    provider.signer.set_signer(signer);
+    let provider = notary_crypto_provider(notary_signing_key)?;
 
     let att_config = AttestationConfig::builder()
         .supported_signature_algs(Vec::from_iter(provider.signer.supported_algs()))

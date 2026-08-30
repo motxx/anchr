@@ -25,6 +25,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
+const NOTARY_PUBLIC_KEY =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+
 /**
  * Inject the real validateTlsn bound to a specific verifier binary path, so
  * the verify() orchestrator exercises the genuine TLSNotary path against the
@@ -33,7 +36,11 @@ import { tmpdir } from "node:os";
 function withVerifierPath(verifierPath: string | null): VerifyProofOptions {
   return {
     schemaOptions: {
-      [ProofSchema.TlsnV1]: { verifierPath, validateTlsn },
+      [ProofSchema.TlsnV1]: {
+        verifierPath,
+        notaryPublicKey: NOTARY_PUBLIC_KEY,
+        validateTlsn,
+      },
     },
   };
 }

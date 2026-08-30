@@ -28,6 +28,10 @@ import { existsSync } from "node:fs";
 import process from "node:process";
 
 const VERIFIER_HOST = process.env.TLSN_VERIFIER_HOST ?? "localhost:7046";
+const VERIFIER_WS_PORT = process.env.TLSN_VERIFIER_WS_PORT ?? "7047";
+const VERIFIER_WS_URL = `ws://${
+  VERIFIER_HOST.split(":")[0] ?? "localhost"
+}:${VERIFIER_WS_PORT}`;
 const REQUIRE_CORE_INFRA = process.env.TLSN_E2E_REQUIRE_CORE === "1";
 const __dirname = import.meta.dirname ?? new URL(".", import.meta.url).pathname;
 const PROVER_BIN = join(
@@ -44,9 +48,18 @@ const TARGET_URL = "https://api.bitflyer.com/v1/ticker?product_code=BTC_JPY";
 const TARGET_SERVER = "api.bitflyer.com";
 const TARGET_BODY_MARKER = "BTC_JPY";
 const PRESENTATION_PATH = "/tmp/e2e-tlsn.presentation.tlsn";
+const LOCAL_PRESENTATION_PATH_1 = "/tmp/e2e-tlsn-local-1.presentation.tlsn";
+const LOCAL_PRESENTATION_PATH_2 = "/tmp/e2e-tlsn-local-2.presentation.tlsn";
+const WS_PRESENTATION_PATH = "/tmp/e2e-tlsn-ws.presentation.tlsn";
 const MUTATED_PRESENTATION_PATH = "/tmp/e2e-tlsn-mutated.presentation.tlsn";
 const PROVER_ATTEMPTS = 3;
 const TLSN_E2E_ORACLE_ID = "tlsn-e2e-oracle";
+const TEST_NOTARY_PUBLIC_KEY =
+  "0279be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
+const TEST_NOTARY_PRIVATE_KEY =
+  "0000000000000000000000000000000000000000000000000000000000000001";
+const OTHER_NOTARY_PUBLIC_KEY =
+  "0379be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 
 let filePresentationPromise: Promise<string> | undefined;
 
@@ -69,6 +82,13 @@ function createTlsnE2eOracle(): Oracle {
         {
           attachments: result.attachments,
           schema_evidence: result.schema_evidence,
+        },
+        {
+          schemaOptions: {
+            [ProofSchema.TlsnV1]: {
+              notaryPublicKey: TEST_NOTARY_PUBLIC_KEY,
+            },
+          },
         },
       );
 
@@ -150,6 +170,39 @@ async function runProverOnce(targetUrl: string): Promise<string> {
   return stdout.trim();
 }
 
+async function runLocalProverOnce(outputPath: string): Promise<void> {
+  const proc = spawn([PROVER_BIN, TARGET_URL, "-o", outputPath], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX: TEST_NOTARY_PRIVATE_KEY },
+  });
+  await proc.exited;
+  if (proc.exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`Local prover failed: ${stderr}`);
+  }
+}
+
+async function runWsProverOnce(): Promise<void> {
+  const proc = spawn([
+    PROVER_BIN,
+    "--verifier",
+    VERIFIER_WS_URL,
+    TARGET_URL,
+    "-o",
+    WS_PRESENTATION_PATH,
+  ], {
+    stdout: "pipe",
+    stderr: "pipe",
+    env: { ANCHR_TLSN_NOTARY_PRIVATE_KEY_HEX: TEST_NOTARY_PRIVATE_KEY },
+  });
+  await proc.exited;
+  if (proc.exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`WebSocket prover failed: ${stderr}`);
+  }
+}
+
 async function generatePresentation(targetUrl: string): Promise<string> {
   let lastError: Error | undefined;
 
@@ -178,10 +231,12 @@ function getFilePresentation(): Promise<string> {
 
 async function verifyPresentation(
   path: string,
+  notaryPublicKey = TEST_NOTARY_PUBLIC_KEY,
 ): Promise<Record<string, unknown>> {
   const proc = spawn([VERIFIER_BIN, "verify", path], {
     stdout: "pipe",
     stderr: "pipe",
+    env: { ANCHR_TLSN_NOTARY_PUBLIC_KEY_HEX: notaryPublicKey },
   });
   await proc.exited;
   const stdout = await new Response(proc.stdout).text();
@@ -248,6 +303,47 @@ describe("TLSNotary E2E", () => {
     expect(result.server_name).toBe(TARGET_SERVER);
     expect(typeof result.revealed_body).toBe("string");
     expect(result.revealed_body as string).toContain(TARGET_BODY_MARKER);
+  });
+
+  test("two local prover runs use the same configured notary key", async () => {
+    if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
+      console.error("[e2e] SKIPPED — infrastructure not ready");
+      return;
+    }
+
+    await runLocalProverOnce(LOCAL_PRESENTATION_PATH_1);
+    await runLocalProverOnce(LOCAL_PRESENTATION_PATH_2);
+
+    const first = await verifyPresentation(LOCAL_PRESENTATION_PATH_1);
+    const second = await verifyPresentation(LOCAL_PRESENTATION_PATH_2);
+    expect(first.valid).toBe(true);
+    expect(second.valid).toBe(true);
+  });
+
+  test("WebSocket prover uses the configured notary key", async () => {
+    if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
+      console.error("[e2e] SKIPPED — infrastructure not ready");
+      return;
+    }
+
+    await runWsProverOnce();
+    const result = await verifyPresentation(WS_PRESENTATION_PATH);
+    expect(result.valid).toBe(true);
+  });
+
+  test("INV-01: rejects a presentation signed by a non-pinned notary", async () => {
+    if (!verifierReachable || !proverAvailable || !verifierBinAvailable) {
+      console.error("[e2e] SKIPPED — infrastructure not ready");
+      return;
+    }
+
+    await getFilePresentation();
+    const result = await verifyPresentation(
+      PRESENTATION_PATH,
+      OTHER_NOTARY_PUBLIC_KEY,
+    );
+    expect(result.valid).toBe(false);
+    expect(result.error).toContain("Notary key mismatch");
   });
 
   // INV-01
